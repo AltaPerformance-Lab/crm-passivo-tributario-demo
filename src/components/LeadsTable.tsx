@@ -1,0 +1,528 @@
+"use client";
+
+import { useState, useEffect, useCallback, useTransition } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import type { Lead, LeadStatus } from "@prisma/client";
+import { formatCNPJ } from "@//lib/utils";
+import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton";
+import {
+  PieChart as ChartIcon,
+  Download,
+  Settings,
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import UpcomingReminders from "./UpcomingReminders";
+
+const statusOptions: LeadStatus[] = [
+  "A_VERIFICAR",
+  "VERIFICADO",
+  "CONTATADO",
+  "AGUARDANDO_RESPOSTA",
+  "EM_NEGOCIACAO",
+  "NAO_TEM_INTERESSE",
+  "CONVERTIDO",
+  "DESCARTADO",
+];
+
+const statusColors: Record<LeadStatus, { bg: string; text: string }> = {
+  A_VERIFICAR: { bg: "bg-gray-200", text: "text-gray-900" },
+  VERIFICADO: { bg: "bg-blue-200", text: "text-blue-900" },
+  CONTATADO: { bg: "bg-cyan-200", text: "text-cyan-900" },
+  AGUARDANDO_RESPOSTA: { bg: "bg-orange-200", text: "text-orange-900" },
+  EM_NEGOCIACAO: { bg: "bg-purple-200", text: "text-purple-900" },
+  NAO_TEM_INTERESSE: { bg: "bg-pink-200", text: "text-pink-900" },
+  CONVERTIDO: { bg: "bg-green-200", text: "text-green-900" },
+  DESCARTADO: { bg: "bg-red-200", text: "text-red-900" },
+};
+
+const LeadRow = ({
+  lead,
+  index,
+  isSelected,
+  onSelect,
+  page,
+  take,
+}: {
+  lead: Lead;
+  index: number;
+  isSelected: boolean;
+  onSelect: (leadId: number) => void;
+  page: number;
+  take: number;
+}) => {
+  const router = useRouter();
+  const handleRowClick = () => router.push(`/leads/${lead.id}`);
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect(lead.id);
+  };
+  const colors = statusColors[lead.status] || statusColors.A_VERIFICAR;
+  const itemNumber = (page - 1) * take + index + 1;
+
+  return (
+    <tr
+      onClick={handleRowClick}
+      className={`transition-colors duration-200 cursor-pointer ${
+        isSelected ? "bg-blue-900/50" : "hover:bg-gray-700"
+      }`}
+    >
+      <td className="px-5 py-4 border-b border-gray-600 text-center">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onClick={handleCheckboxClick}
+          onChange={() => {}}
+          className="form-checkbox h-5 w-5 bg-gray-800 border-gray-600 rounded text-blue-600 focus:ring-blue-500"
+        />
+      </td>
+      <td className="px-5 py-4 border-b border-gray-600 text-sm text-center font-semibold text-gray-400">
+        {itemNumber}
+      </td>
+      <td className="px-5 py-4 border-b border-gray-600 text-sm">
+        <p className="font-semibold whitespace-nowrap">{lead.nomeDevedor}</p>
+        {lead.nomeFantasia && (
+          <p className="text-gray-400 text-xs whitespace-nowrap">
+            {lead.nomeFantasia}
+          </p>
+        )}
+      </td>
+      <td className="px-5 py-4 border-b border-gray-600 text-sm font-mono">
+        {formatCNPJ(lead.cnpj)}
+      </td>
+      <td className="px-5 py-4 border-b border-gray-600 text-sm">
+        <span
+          className={`relative inline-block px-3 py-1 font-semibold leading-tight ${colors.text}`}
+        >
+          <span
+            aria-hidden
+            className={`absolute inset-0 ${colors.bg} opacity-50 rounded-full`}
+          ></span>
+          <span className="relative text-xs">
+            {lead.status.replace(/_/g, " ")}
+          </span>
+        </span>
+      </td>
+      <td className="px-5 py-4 border-b border-gray-600 text-sm text-right font-semibold text-red-400">
+        {lead.valorTotalDivida.toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        })}
+      </td>
+    </tr>
+  );
+};
+
+const Pagination = ({
+  currentPage,
+  totalPages,
+}: {
+  currentPage: number;
+  totalPages: number;
+}) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const createPageURL = (pageNumber: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", pageNumber.toString());
+    return `${pathname}?${params.toString()}`;
+  };
+
+  return (
+    <div className="flex justify-center items-center gap-4 text-sm">
+      <button
+        onClick={() => router.push(createPageURL(currentPage - 1))}
+        disabled={currentPage <= 1}
+        className="flex items-center gap-1 px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <ChevronLeft size={16} /> Anterior
+      </button>
+      <span>
+        Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+      </span>
+      <button
+        onClick={() => router.push(createPageURL(currentPage + 1))}
+        disabled={currentPage >= totalPages}
+        className="flex items-center gap-1 px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Próxima <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+};
+
+type LocationData = { uf: string; cities: string[] };
+
+export default function LeadsTable() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(
+    new Set()
+  );
+
+  const [isBulkEnriching, setIsBulkEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState(0);
+  const [enrichMessage, setEnrichMessage] = useState("");
+
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const searchTerm = searchParams.get("search") || "";
+  const statusFilter = searchParams.get("status") || "A_VERIFICAR";
+  const ufFilter = searchParams.get("uf") || "";
+  const cityFilter = searchParams.get("city") || "";
+  const sortOrder = searchParams.get("sortOrder") || "desc";
+
+  const [locations, setLocations] = useState<LocationData[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const take = 50;
+
+  const handleFilterChange = useCallback(
+    (name: string, value: string) => {
+      const params = new URLSearchParams(searchParams);
+      params.set(name, value);
+      if (name !== "page") {
+        params.set("page", "1");
+      }
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [searchParams, router, pathname]
+  );
+
+  useEffect(() => {
+    const fetchLeads = async () => {
+      setIsLoading(true);
+      const params = new URLSearchParams(searchParams);
+      if (!params.get("page")) params.set("page", "1");
+      if (!params.get("status")) params.set("status", "A_VERIFICAR");
+      if (!params.get("sortOrder")) params.set("sortOrder", "desc");
+
+      try {
+        const response = await fetch(`/api/leads?${params.toString()}`);
+        if (!response.ok) throw new Error("Falha na resposta da API");
+        const { data, total, totalPages } = await response.json();
+        setLeads(data);
+        setTotalLeads(total);
+        setTotalPages(totalPages);
+        setSelectedLeadIds(new Set());
+      } catch (error) {
+        console.error("Erro ao buscar leads:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLeads();
+  }, [searchParams]);
+
+  useEffect(() => {
+    const getLocations = async () => {
+      try {
+        const response = await fetch("/api/locations");
+        const data = await response.json();
+        setLocations(data);
+      } catch (error) {
+        console.error("Erro ao buscar cidades:", error);
+      }
+    };
+    getLocations();
+  }, []);
+
+  useEffect(() => {
+    if (ufFilter) {
+      const selectedUfData = locations.find((loc) => loc.uf === ufFilter);
+      setAvailableCities(selectedUfData?.cities || []);
+    } else {
+      setAvailableCities([]);
+    }
+    if (!searchParams.has("city")) {
+      handleFilterChange("city", "");
+    }
+  }, [ufFilter, locations, searchParams, handleFilterChange]);
+
+  const handleSelectLead = (leadId: number) => {
+    setSelectedLeadIds((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(leadId)) newSelected.delete(leadId);
+      else newSelected.add(leadId);
+      return newSelected;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedLeadIds.size === leads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(leads.map((lead) => lead.id)));
+    }
+  };
+
+  const handleExport = () => {
+    if (selectedLeadIds.size === 0) return;
+    const leadsToExport = leads.filter((lead) => selectedLeadIds.has(lead.id));
+    const content = leadsToExport
+      .map((lead) => `${formatCNPJ(lead.cnpj)}\n${lead.nomeDevedor}`)
+      .join("\n\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "leads_para_contato.txt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleBulkEnrich = async () => {
+    const leadsToEnrich = leads.filter((lead) => !lead.empresaId);
+    if (leadsToEnrich.length === 0) {
+      alert("Todos os leads nesta página já foram enriquecidos.");
+      return;
+    }
+    setIsBulkEnriching(true);
+    setEnrichMessage(`Iniciando... 0 de ${leadsToEnrich.length} enriquecidos.`);
+    let processedCount = 0;
+    for (const lead of leadsToEnrich) {
+      try {
+        await fetch("/api/cnpj/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cnpj: lead.cnpj }),
+        });
+      } catch (error) {
+        console.error(`Falha ao enriquecer CNPJ ${lead.cnpj}:`, error);
+      } finally {
+        processedCount++;
+        setEnrichProgress((processedCount / leadsToEnrich.length) * 100);
+        setEnrichMessage(
+          `${processedCount} de ${leadsToEnrich.length} leads processados.`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+    setEnrichMessage("Enriquecimento concluído! Atualizando a lista...");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setIsBulkEnriching(false);
+    setEnrichProgress(0);
+    setEnrichMessage("");
+    router.refresh();
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <Link href="/">
+          <h1 className="text-3xl font-bold hover:text-blue-400 transition-colors">
+            Painel de Leads
+          </h1>
+        </Link>
+        <div className="flex items-center gap-4 flex-wrap">
+          <Link
+            href="/importar"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
+          >
+            <Upload size={18} /> Importar CSV
+          </Link>
+          <button
+            onClick={handleBulkEnrich}
+            disabled={isBulkEnriching || isLoading}
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed"
+          >
+            {isBulkEnriching ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Sparkles size={18} />
+            )}{" "}
+            Enriquecer Página
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={selectedLeadIds.size === 0 || isBulkEnriching}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed"
+          >
+            <Download size={18} /> Exportar ({selectedLeadIds.size})
+          </button>
+          <Link
+            href="/dashboard"
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
+          >
+            <ChartIcon size={18} /> Ver Métricas
+          </Link>
+          <Link
+            href="/configuracoes"
+            className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
+          >
+            <Settings size={18} /> Configurações
+          </Link>
+          <LogoutButton />
+        </div>
+      </div>
+
+      {isBulkEnriching && (
+        <div className="mb-4">
+          <div className="w-full bg-gray-700 rounded-full h-2.5">
+            <div
+              className="bg-teal-600 h-2.5 rounded-full"
+              style={{
+                width: `${enrichProgress}%`,
+                transition: "width 0.5s ease-in-out",
+              }}
+            ></div>
+          </div>
+          <p className="text-center text-sm text-teal-300 mt-1">
+            {enrichMessage}
+          </p>
+        </div>
+      )}
+
+      <UpcomingReminders />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+        <input
+          type="text"
+          defaultValue={searchTerm}
+          onBlur={(e) => handleFilterChange("search", e.target.value)}
+          placeholder="Buscar por Nome ou CNPJ..."
+          className="md:col-span-2 px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => handleFilterChange("status", e.target.value)}
+          className="px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos os Status</option>
+          {statusOptions.map((s) => (
+            <option key={s} value={s}>
+              {s.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
+        <select
+          value={ufFilter}
+          onChange={(e) => handleFilterChange("uf", e.target.value)}
+          className="px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos os Estados</option>
+          {locations.map((loc) => (
+            <option key={loc.uf} value={loc.uf}>
+              {loc.uf}
+            </option>
+          ))}
+        </select>
+        <select
+          value={cityFilter}
+          onChange={(e) => handleFilterChange("city", e.target.value)}
+          disabled={!ufFilter && availableCities.length === 0}
+          className="px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <option value="">Todas as Cidades</option>
+          {availableCities.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-2 bg-gray-700 px-4 py-2 border border-gray-600 rounded-lg md:col-span-5">
+          <label className="text-sm text-gray-400">Ordenar por:</label>
+          <button
+            onClick={() => handleFilterChange("sortOrder", "desc")}
+            className={`px-2 py-1 rounded-md text-sm transition-colors ${
+              sortOrder === "desc"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-600 hover:bg-gray-500"
+            }`}
+          >
+            <ArrowDown className="inline-block" size={16} /> Maior Valor
+          </button>
+          <button
+            onClick={() => handleFilterChange("sortOrder", "asc")}
+            className={`px-2 py-1 rounded-md text-sm transition-colors ${
+              sortOrder === "asc"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-600 hover:bg-gray-500"
+            }`}
+          >
+            <ArrowUp className="inline-block" size={16} /> Menor Valor
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 shadow-md rounded-lg overflow-x-auto">
+        <table className="min-w-full leading-normal">
+          <thead>
+            <tr className="bg-gray-700 text-gray-300 uppercase text-sm">
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-center">
+                <input
+                  type="checkbox"
+                  onChange={handleSelectAll}
+                  checked={
+                    leads.length > 0 && selectedLeadIds.size === leads.length
+                  }
+                  className="form-checkbox h-5 w-5 bg-gray-800 border-gray-600 rounded text-blue-600 focus:ring-blue-500"
+                />
+              </th>
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-left w-12">
+                #
+              </th>
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+                Nome do Devedor
+              </th>
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+                CNPJ
+              </th>
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+                Status
+              </th>
+              <th className="px-5 py-3 border-b-2 border-gray-600 text-right">
+                Valor da Dívida
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {!isLoading &&
+              leads.map((lead, index) => (
+                <LeadRow
+                  key={lead.id}
+                  lead={lead}
+                  index={index}
+                  isSelected={selectedLeadIds.has(lead.id)}
+                  onSelect={handleSelectLead}
+                  page={currentPage}
+                  take={take}
+                />
+              ))}
+          </tbody>
+        </table>
+
+        {isLoading && (
+          <div className="p-8 text-center text-gray-400">
+            <Loader2 className="mx-auto animate-spin" />
+          </div>
+        )}
+
+        <div className="p-4">
+          {!isLoading && totalLeads > 0 && (
+            <Pagination currentPage={currentPage} totalPages={totalPages} />
+          )}
+          {!isLoading && totalLeads === 0 && (
+            <p className="text-center text-gray-400">
+              Nenhum resultado encontrado.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
