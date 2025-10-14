@@ -1,7 +1,7 @@
 // src/app/api/proposals/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 import { unlink } from "fs/promises";
 import path from "path";
 

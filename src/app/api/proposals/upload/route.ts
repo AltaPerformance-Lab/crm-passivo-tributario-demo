@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import prisma from "@/lib/prisma";
+import { put } from "@vercel/blob";
+// CORREÇÃO FINAL: Ajustamos o caminho para 5 níveis acima, alcançando a raiz.
+import { auth } from "../../../../../auth";
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get("proposal") as File | null;
@@ -16,22 +22,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
     const filename = `${Date.now()}-${file.name.replace(/\s/g, "_")}`;
 
-    const proposalsDir = path.join(process.cwd(), "public", "propostas");
-    await mkdir(proposalsDir, { recursive: true });
-
-    const savePath = path.join(proposalsDir, filename);
-    await writeFile(savePath, fileBuffer);
-
-    const publicPath = `/propostas/${filename}`;
+    const blob = await put(filename, file, {
+      access: "public",
+    });
 
     const novaProposta = await prisma.proposta.create({
       data: {
         negocioId: parseInt(negocioId),
-        caminhoArquivo: publicPath, // Correto
-        nomeArquivo: file.name, // Correto
+        caminhoArquivo: blob.url,
+        nomeArquivo: file.name,
       },
     });
 

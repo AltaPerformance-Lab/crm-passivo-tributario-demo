@@ -1,7 +1,7 @@
 // src/app/api/config/upload-logo/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 

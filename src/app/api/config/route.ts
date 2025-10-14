@@ -1,7 +1,7 @@
 // src/app/api/config/route.ts
 
 import { NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 
 // Função GET: Busca a configuração atual no banco de dados
 export async function GET() {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 
 // Função PATCH: agora atualiza tanto 'concluido' quanto a 'data'
 export async function PATCH(

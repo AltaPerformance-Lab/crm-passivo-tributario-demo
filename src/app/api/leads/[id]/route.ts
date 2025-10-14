@@ -1,7 +1,7 @@
 // src/app/api/leads/[id]/route.ts
 
 import { NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client"; // Importa o Enum LeadStatus do Prisma
 
 // A função PATCH recebe 'params' para pegar o ID da URL

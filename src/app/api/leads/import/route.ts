@@ -1,7 +1,7 @@
 // src/app/api/leads/import/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 import type { Lead } from "@prisma/client";
 
 // Definindo o tipo de dado que esperamos receber

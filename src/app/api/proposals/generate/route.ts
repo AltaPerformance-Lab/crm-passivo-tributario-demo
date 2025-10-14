@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@//lib/prisma";
+import prisma from "@/lib/prisma";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 // --- MUDANÇA FINAL: Importando 'pdf' em vez de 'render' ---
