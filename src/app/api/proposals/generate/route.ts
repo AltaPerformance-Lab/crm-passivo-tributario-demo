@@ -37,22 +37,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // ======================= LOGS PARA DEPURACAO =======================
-    // Aqui verificamos os tipos de dados antes de passá-los para o componente PDF.
-    console.log("--- INÍCIO DEBUG PDF ---");
-    console.log("Verificando os tipos de dados de 'proposalData':");
-    console.log(`Tipo de 'objeto': ${typeof proposalData.objeto}`);
-    console.log(`Tipo de 'escopo': ${typeof proposalData.escopo}`);
-    console.log(`Tipo de 'valores': ${typeof proposalData.valores}`);
+    // Crie objetos "planos" com apenas os dados necessários para o PDF.
+    // Isso evita passar tipos complexos do Prisma (como Date) para o renderer.
+    const plainClient = {
+      nomeDevedor: lead.nomeDevedor,
+      cnpj: lead.cnpj,
+    };
 
-    // Este log mostrará a estrutura completa do objeto.
-    // Se for um JSON de um editor de texto, você verá aqui.
-    console.log(
-      "Conteúdo completo de 'proposalData':",
-      JSON.stringify(proposalData, null, 2)
-    );
-    console.log("--- FIM DEBUG PDF ---");
-    // ===================================================================
+    const plainConfig = {
+      nomeEmpresa: config.nomeEmpresa,
+      cnpj: config.cnpj,
+      endereco: config.endereco,
+      email: config.email,
+      telefone: config.telefone,
+    };
 
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },
@@ -65,10 +63,11 @@ export async function POST(request: Request) {
       },
     });
 
+    // Use os objetos planos em vez dos objetos completos do Prisma
     const doc = React.createElement(ProposalDocument, {
-      client: lead,
+      client: plainClient, // Corrigido
       proposalData: proposalData,
-      config: config,
+      config: plainConfig, // Corrigido
     });
 
     const pdfBlob = await pdf(doc as any).toBlob();
@@ -97,7 +96,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    // O erro será capturado aqui e logado nos logs da Vercel
     console.error("ERRO DETALHADO AO GERAR PDF:", error);
     return NextResponse.json(
       { message: "Falha ao gerar o PDF.", error: (error as Error).message },
