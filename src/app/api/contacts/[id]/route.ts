@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
 // Função PATCH para ATUALIZAR um contato existente
 export async function PATCH(
   request: Request,

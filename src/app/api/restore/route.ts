@@ -4,6 +4,8 @@ import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
 import os from "os";
 
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
   let tempFilePath = "";
   try {

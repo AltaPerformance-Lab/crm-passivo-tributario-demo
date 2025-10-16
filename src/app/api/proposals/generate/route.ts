@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { put } from '@vercel/blob';
-import { pdf } from '@react-pdf/renderer';
-import { ProposalDocument } from '@/components/ProposalDocument';
-import React from 'react';
-import { auth } from '../../../../../auth';
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { put } from "@vercel/blob";
+import { pdf } from "@react-pdf/renderer";
+import { ProposalDocument } from "@/components/ProposalDocument";
+import React from "react";
+import { auth } from "../../../../../auth";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const session = await auth();
   if (!session) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   try {
@@ -17,20 +19,20 @@ export async function POST(request: Request) {
 
     if (!leadId || !proposalData) {
       return NextResponse.json(
-        { message: 'Dados insuficientes para gerar a proposta.' },
+        { message: "Dados insuficientes para gerar a proposta." },
         { status: 400 }
       );
     }
 
     const config = await prisma.configuracao.findUnique({ where: { id: 1 } });
     if (!config) {
-      throw new Error('Configurações da empresa não encontradas.');
+      throw new Error("Configurações da empresa não encontradas.");
     }
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) {
       return NextResponse.json(
-        { message: 'Lead não encontrado.' },
+        { message: "Lead não encontrado." },
         { status: 404 }
       );
     }
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
       proposalData: proposalData,
       config: config,
     });
-    
+
     // CORREÇÃO FINAL: Geramos o PDF diretamente para um Blob.
     const pdfBlob = await pdf(doc as any).toBlob();
 
@@ -59,8 +61,8 @@ export async function POST(request: Request) {
 
     // Enviamos o Blob, que é um tipo aceite, para o Vercel Blob
     const blob = await put(filename, pdfBlob, {
-      access: 'public',
-      contentType: 'application/pdf',
+      access: "public",
+      contentType: "application/pdf",
     });
 
     const novaProposta = await prisma.proposta.create({
@@ -80,11 +82,10 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Erro ao gerar PDF:', error);
+    console.error("Erro ao gerar PDF:", error);
     return NextResponse.json(
-      { message: 'Falha ao gerar o PDF.', error: (error as Error).message },
+      { message: "Falha ao gerar o PDF.", error: (error as Error).message },
       { status: 500 }
     );
   }
 }
-

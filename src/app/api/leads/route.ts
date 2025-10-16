@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client";
 
+export const runtime = "nodejs";
+
 // --- CORREÇÃO: Força a rota a ser sempre dinâmica ---
 export const dynamic = "force-dynamic";
 

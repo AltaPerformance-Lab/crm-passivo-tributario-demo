@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
 // Função GET: Busca a configuração atual no banco de dados
 export async function GET() {
   try {

@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { unlink } from "fs/promises";
 import path from "path";
 
+export const runtime = "nodejs";
+
 // Função DELETE: para apagar uma proposta
 export async function DELETE(
   request: NextRequest,

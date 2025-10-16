@@ -7,6 +7,8 @@ import type { Lead } from "@prisma/client";
 // Definindo o tipo de dado que esperamos receber
 type LeadInput = Omit<Lead, "id" | "createdAt" | "updatedAt">;
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   try {
     const leads: LeadInput[] = await request.json();

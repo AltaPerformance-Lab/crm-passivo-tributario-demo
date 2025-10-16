@@ -2,10 +2,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob"; // 1. Importamos o 'put' do Vercel Blob
+import { auth } from "../../../../../auth"; // 2. Importamos a autenticação
+
+// Removemos as importações de 'fs' e 'path'
+// import { writeFile, mkdir } from "fs/promises";
+// import path from "path";
+
+// Adicionamos o runtime do Node.js por usar o Prisma
+export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  // 3. Adicionamos a verificação de sessão
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get("logo") as File | null;
@@ -17,34 +30,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Converte o arquivo para um buffer que pode ser salvo
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    // 4. Criamos um nome de ficheiro estático para ser fácil de substituir
+    const filename = `company-logo.${file.name.split(".").pop()}`;
 
-    // Cria um nome de arquivo estático para a logo, para ser fácil de referenciar
-    const fileExtension = path.extname(file.name);
-    const filename = `company-logo${fileExtension}`;
+    // 5. Enviamos o ficheiro para o Vercel Blob
+    const blob = await put(filename, file, {
+      access: "public",
+      // Adicionamos 'addRandomSuffix: false' para garantir que o nome do ficheiro seja sempre o mesmo,
+      // substituindo o logótipo antigo.
+      addRandomSuffix: false,
+    });
 
-    // Define o diretório e garante que ele exista
-    const logosDir = path.join(process.cwd(), "public", "logos");
-    await mkdir(logosDir, { recursive: true });
-
-    // Salva o arquivo
-    const savePath = path.join(logosDir, filename);
-    await writeFile(savePath, fileBuffer);
-
-    // Define o caminho público que será salvo no banco
-    const publicUrl = `/logos/${filename}`;
-
-    // Atualiza o registro de configuração no banco com o caminho da nova logo
+    // 6. Atualizamos o registro de configuração com a URL do Blob
     await prisma.configuracao.update({
       where: { id: 1 },
       data: {
-        logoUrl: publicUrl,
+        logoUrl: blob.url,
       },
     });
 
     return NextResponse.json(
-      { success: true, logoUrl: publicUrl },
+      { success: true, logoUrl: blob.url },
       { status: 201 }
     );
   } catch (error) {

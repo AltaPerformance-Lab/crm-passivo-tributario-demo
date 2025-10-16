@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client"; // Importa o Enum LeadStatus do Prisma
 
+export const runtime = "nodejs";
+
 // A função PATCH recebe 'params' para pegar o ID da URL
 export async function PATCH(
   request: Request,

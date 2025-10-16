@@ -4,6 +4,8 @@ import { put } from "@vercel/blob";
 // CORREÇÃO FINAL: Ajustamos o caminho para 5 níveis acima, alcançando a raiz.
 import { auth } from "../../../../../auth";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session) {
