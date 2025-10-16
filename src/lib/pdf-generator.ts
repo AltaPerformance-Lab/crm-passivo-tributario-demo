@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, PDFFont } from "pdf-lib";
 
-// As interfaces não precisam de alteração
+// Interfaces (sem alterações)
 interface SimpleConfig {
   nomeEmpresa: string | null;
   cnpj: string | null;
@@ -24,6 +24,41 @@ interface PdfData {
   proposalData: ProposalData;
   logoImageBuffer?: ArrayBuffer;
 }
+
+// ==========================================================
+//                 MELHORIAS DE DESIGN
+// ==========================================================
+// Centralizamos as configurações de design em um objeto "theme"
+// Fica muito mais fácil ajustar cores e fontes no futuro!
+const theme = {
+  colors: {
+    primary: rgb(0.12, 0.38, 0.57), // Um azul profissional
+    text: rgb(0.2, 0.2, 0.2), // Cinza escuro para texto
+    lightText: rgb(0.5, 0.5, 0.5), // Cinza claro para detalhes
+    line: rgb(0.9, 0.9, 0.9), // Linhas divisórias
+  },
+  fontSizes: {
+    h1: 20,
+    h2: 14,
+    body: 10,
+    small: 8,
+  },
+  lineHeight: 16,
+};
+// ==========================================================
+
+// Função para formatar o CNPJ
+const formatCNPJ = (cnpj: string | null): string => {
+  if (!cnpj) return "CNPJ não informado";
+  // Remove caracteres não numéricos
+  const cleaned = cnpj.replace(/\D/g, "");
+  // Aplica a máscara
+  if (cleaned.length !== 14) return cnpj; // Retorna o original se não tiver 14 dígitos
+  return cleaned.replace(
+    /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+    "$1.$2.$3/$4-$5"
+  );
+};
 
 function wrapText(
   text: string,
@@ -65,50 +100,29 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   const margin = 50;
   let y = height - margin;
 
-  // ==========================================================
-  //         CABEÇALHO COM LÓGICA DE LAYOUT CORRIGIDA
-  // ==========================================================
-  const initialY = y;
-  let logoDims = { width: 0, height: 45 }; // Altura mínima para o texto da direita
+  // --- CABEÇALHO REFEITO ---
+  const headerStartY = y;
+  let logoHeight = 40; // Altura fixa para a logo para consistência
 
   if (logoImageBuffer) {
     try {
       const logoImage = await pdfDoc.embedPng(logoImageBuffer);
-      const desiredWidth = 100;
-      const scale = desiredWidth / logoImage.width;
-      logoDims = { width: desiredWidth, height: logoImage.height * scale };
+      const scale = logoHeight / logoImage.height;
+      const logoWidth = logoImage.width * scale;
+      page.drawImage(logoImage, {
+        x: margin,
+        y: headerStartY - logoHeight,
+        width: logoWidth,
+        height: logoHeight,
+      });
     } catch (e) {
       console.error("Não foi possível incorporar a imagem.", e);
     }
   }
 
-  // Define a altura total do cabeçalho como a altura do maior elemento (logo ou texto)
-  const textBlockHeight = 60; // Altura estimada para o bloco de texto da direita
-  const headerHeight = Math.max(logoDims.height, textBlockHeight);
-
-  // Desenha a logo (se existir) centralizada verticalmente no espaço do cabeçalho
-  if (logoImageBuffer && logoDims.width > 0) {
-    const logoImage = await pdfDoc.embedPng(logoImageBuffer);
-    page.drawImage(logoImage, {
-      x: margin,
-      y: initialY - (headerHeight + logoDims.height) / 2, // Alinha verticalmente
-      width: logoDims.width,
-      height: logoDims.height,
-    });
-  } else {
-    page.drawText("Logótipo da Empresa", {
-      x: margin,
-      y: initialY - 10,
-      font: font,
-      size: 10,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-  }
-
-  // Desenha o texto da direita, também alinhado verticalmente
   const drawRightAlignedText = (
     text: string,
-    options: { font: PDFFont; size: number; y: number }
+    options: { font: PDFFont; size: number; y: number; color?: any }
   ) => {
     const textWidth = options.font.widthOfTextAtSize(text, options.size);
     page.drawText(text, {
@@ -116,123 +130,156 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
       y: options.y,
       font: options.font,
       size: options.size,
+      color: options.color || theme.colors.text,
     });
   };
-  let headerTextY = initialY - (headerHeight - textBlockHeight) / 2; // Posição Y inicial para alinhar
+
+  let headerTextY = headerStartY;
   drawRightAlignedText(config.nomeEmpresa || "Nome da Empresa", {
     font: boldFont,
-    size: 12,
+    size: theme.fontSizes.body,
     y: headerTextY,
-  });
-  headerTextY -= 15;
-  drawRightAlignedText(config.cnpj || "CNPJ não informado", {
-    font: font,
-    size: 9,
-    y: headerTextY,
+    color: theme.colors.text,
   });
   headerTextY -= 12;
-  drawRightAlignedText(config.endereco || "Endereço não informado", {
+  // CNPJ CORRIGIDO E FORMATADO
+  drawRightAlignedText(formatCNPJ(config.cnpj), {
     font: font,
-    size: 9,
+    size: theme.fontSizes.small,
     y: headerTextY,
+    color: theme.colors.lightText,
+  });
+  headerTextY -= 12;
+  drawRightAlignedText(config.endereco || "Endereço", {
+    font: font,
+    size: theme.fontSizes.small,
+    y: headerTextY,
+    color: theme.colors.lightText,
   });
   headerTextY -= 12;
   drawRightAlignedText(
     `Email: ${config.email || ""} | Tel: ${config.telefone || ""}`,
-    { font: font, size: 9, y: headerTextY }
+    {
+      font: font,
+      size: theme.fontSizes.small,
+      y: headerTextY,
+      color: theme.colors.lightText,
+    }
   );
 
-  // Move o cursor 'y' para baixo do cabeçalho, com base na sua altura calculada
-  y = initialY - headerHeight - 10;
-
-  // Linha divisória
+  y = headerStartY - logoHeight - 20;
   page.drawLine({
     start: { x: margin, y: y },
     end: { x: width - margin, y: y },
     thickness: 1,
-    color: rgb(0.9, 0.9, 0.9),
+    color: theme.colors.line,
   });
-  y -= 30;
+  y -= 40;
 
-  // ==========================================================
-  //                FIM DAS CORREÇÕES DO CABEÇALHO
-  // ==========================================================
-
-  // O resto do código continua exatamente igual...
+  // --- CORPO DO DOCUMENTO ---
   page.drawText("Proposta de Serviços Jurídicos", {
     x: margin,
     y: y,
     font: boldFont,
-    size: 18,
+    size: theme.fontSizes.h1,
+    color: theme.colors.text,
+  });
+  y -= 30;
+
+  // Bloco de informações do cliente
+  const clientInfoY = y;
+  page.drawText("Para:", {
+    x: margin,
+    y: clientInfoY,
+    font: boldFont,
+    size: theme.fontSizes.body,
+    color: theme.colors.text,
+  });
+  page.drawText(client.nomeDevedor || "Não informado", {
+    x: margin + 35,
+    y: clientInfoY,
+    font: font,
+    size: theme.fontSizes.body,
+    color: theme.colors.text,
+  });
+
+  const dates = `Data de Emissão: ${new Date().toLocaleDateString(
+    "pt-BR"
+  )}   |   Válida até: ${proposalData.validade}`;
+  const datesWidth = font.widthOfTextAtSize(dates, theme.fontSizes.small);
+  page.drawText(dates, {
+    x: width - margin - datesWidth,
+    y: clientInfoY,
+    font: font,
+    size: theme.fontSizes.small,
+    color: theme.colors.lightText,
   });
   y -= 40;
 
-  page.drawText(`Para: ${client.nomeDevedor || "Não informado"}`, {
-    x: margin,
-    y: y,
-    font,
-    size: 12,
-  });
-  y -= 20;
-  page.drawText(`Data de Emissão: ${new Date().toLocaleDateString("pt-BR")}`, {
-    x: margin,
-    y: y,
-    font,
-    size: 12,
-  });
-  y -= 20;
-  page.drawText(`Válida até: ${proposalData.validade}`, {
-    x: margin,
-    y: y,
-    font,
-    size: 12,
-  });
-  y -= 40;
-
+  // Função de Seção Refeita
   const drawSection = (title: string, content: string) => {
-    page.drawText(title, { x: margin, y: y, font: boldFont, size: 14 });
-    y -= 25;
-    const paragraphs = content.split("\n");
-    paragraphs.forEach((paragraph) => {
-      const lines = wrapText(
-        paragraph.trim(),
-        page.getWidth() - 2 * margin,
-        font,
-        12
-      );
-      lines.forEach((line) => {
-        page.drawText(line, {
-          x: margin,
-          y: y,
-          font,
-          size: 12,
-          lineHeight: 15,
-        });
-        y -= 15;
-      });
+    page.drawText(title, {
+      x: margin,
+      y: y,
+      font: boldFont,
+      size: theme.fontSizes.h2,
+      color: theme.colors.primary,
+    });
+    y -= 5;
+    page.drawLine({
+      start: { x: margin, y: y },
+      end: { x: margin + 100, y: y },
+      thickness: 1.5,
+      color: theme.colors.primary,
     });
     y -= 20;
+
+    const lines = wrapText(
+      content,
+      width - 2 * margin,
+      font,
+      theme.fontSizes.body
+    );
+    lines.forEach((line) => {
+      page.drawText(line, {
+        x: margin,
+        y: y,
+        font,
+        size: theme.fontSizes.body,
+        color: theme.colors.text,
+        lineHeight: theme.lineHeight,
+      });
+      y -= theme.lineHeight;
+    });
+    y -= 25;
   };
 
   drawSection("1. Objeto da Proposta", proposalData.objeto);
   drawSection("2. Escopo dos Serviços", proposalData.escopo);
   drawSection("3. Valores e Forma de Pagamento", proposalData.valores);
 
-  // ==========================================================
-  //             RODAPÉ COM ALINHAMENTO CORRIGIDO
-  // ==========================================================
+  // --- RODAPÉ REFEITO ---
+  const footerY = margin;
+  page.drawLine({
+    start: { x: margin, y: footerY },
+    end: { x: width - margin, y: footerY },
+    thickness: 1,
+    color: theme.colors.line,
+  });
   const footerText = `${
     config.nomeEmpresa || "Sua Empresa"
   } - Todos os direitos reservados.`;
-  const footerTextWidth = font.widthOfTextAtSize(footerText, 8);
+  const footerTextWidth = font.widthOfTextAtSize(
+    footerText,
+    theme.fontSizes.small
+  );
   page.drawText(footerText, {
-    x: (width - footerTextWidth) / 2, // Cálculo para centralizar
-    y: margin / 2,
+    x: (width - footerTextWidth) / 2,
+    y: footerY - 20,
     font,
-    size: 8,
-    color: rgb(0.5, 0.5, 0.5),
+    size: theme.fontSizes.small,
+    color: theme.colors.lightText,
   });
-  // ==========================================================
 
   return pdfDoc.save();
 }
