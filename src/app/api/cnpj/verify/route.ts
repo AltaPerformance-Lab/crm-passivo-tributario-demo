@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+// ADICIONADO: Força a rota a usar o runtime do Node.js para compatibilidade com o Prisma
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -34,7 +37,6 @@ export async function POST(request: Request) {
     );
 
     if (!response.ok) {
-      // ATUALIZAÇÃO: Se a API falhar, também descartamos o lead
       await prisma.lead.update({
         where: { id: lead.id },
         data: { status: "DESCARTADO" },
@@ -51,9 +53,7 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
-    // --- MUDANÇA #1: LÓGICA PARA EMPRESAS NÃO ATIVAS ---
     if (data.descricao_situacao_cadastral !== "ATIVA") {
-      // Antes de retornar a mensagem, atualiza o status do lead para DESCARTADO
       await prisma.lead.update({
         where: { id: lead.id },
         data: { status: "DESCARTADO" },
@@ -67,7 +67,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // --- SUA LÓGICA AVANÇADA FOI MANTIDA ---
     let regimeTributarioRecente = null;
     if (data.regime_tributario && data.regime_tributario.length > 0) {
       const maisRecente = data.regime_tributario.sort(
@@ -127,8 +126,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // --- MUDANÇA #2: LÓGICA PARA EMPRESAS ATIVAS ---
-    // Atualiza o lead para conectar a empresa e mudar o status para VERIFICADO
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
