@@ -1,7 +1,8 @@
-// src/app/api/atividades/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+
+// ADICIONADO: Força a rota a usar o runtime do Node.js
+export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {

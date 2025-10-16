@@ -1,32 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-// --- MUDANÇA FINAL: Importando 'pdf' em vez de 'render' ---
-import { pdf } from "@react-pdf/renderer";
-import { ProposalDocument } from "@/components/ProposalDocument";
-import React from "react";
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { put } from '@vercel/blob';
+import { pdf } from '@react-pdf/renderer';
+import { ProposalDocument } from '@/components/ProposalDocument';
+import React from 'react';
+import { auth } from '../../../../../auth';
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
   try {
     const { leadId, proposalData } = await request.json();
 
     if (!leadId || !proposalData) {
       return NextResponse.json(
-        { message: "Dados insuficientes para gerar a proposta." },
+        { message: 'Dados insuficientes para gerar a proposta.' },
         { status: 400 }
       );
     }
 
     const config = await prisma.configuracao.findUnique({ where: { id: 1 } });
     if (!config) {
-      throw new Error("Configurações da empresa não encontradas.");
+      throw new Error('Configurações da empresa não encontradas.');
     }
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) {
       return NextResponse.json(
-        { message: "Lead não encontrado." },
+        { message: 'Lead não encontrado.' },
         { status: 404 }
       );
     }
@@ -42,6 +46,23 @@ export async function POST(request: Request) {
       },
     });
 
+    const doc = React.createElement(ProposalDocument, {
+      client: lead,
+      proposalData: proposalData,
+      config: config,
+    });
+    
+    // CORREÇÃO FINAL: Geramos o PDF diretamente para um Blob.
+    const pdfBlob = await pdf(doc as any).toBlob();
+
+    const filename = `proposta-${negocio.id}-${Date.now()}.pdf`;
+
+    // Enviamos o Blob, que é um tipo aceite, para o Vercel Blob
+    const blob = await put(filename, pdfBlob, {
+      access: 'public',
+      contentType: 'application/pdf',
+    });
+
     const novaProposta = await prisma.proposta.create({
       data: {
         negocioId: negocio.id,
@@ -49,46 +70,21 @@ export async function POST(request: Request) {
         escopo: proposalData.escopo,
         valores: proposalData.valores,
         validade: new Date(proposalData.validade),
-        caminhoArquivo: "", // Temporário
-      },
-    });
-
-    // --- CORREÇÃO DE TIPO APLICADA AQUI ---
-    const doc = React.createElement(ProposalDocument, {
-      client: lead,
-      proposalData: proposalData,
-      config: config,
-    });
-
-    // Forçamos o tipo para 'any' para contornar a incompatibilidade do build
-    const pdfBuffer = await pdf(doc as any).toBuffer();
-
-    // A lógica de salvar o ficheiro permanece a mesma e já está correta
-    const proposalsDir = path.join(process.cwd(), "public", "propostas");
-    await mkdir(proposalsDir, { recursive: true });
-
-    const filename = `proposta-${negocio.id}-${novaProposta.id}.pdf`;
-    const savePath = path.join(proposalsDir, filename);
-    await writeFile(savePath, pdfBuffer);
-
-    const publicPath = `/propostas/${filename}`;
-    const propostaAtualizada = await prisma.proposta.update({
-      where: { id: novaProposta.id },
-      data: {
-        caminhoArquivo: publicPath,
+        caminhoArquivo: blob.url,
         nomeArquivo: `Proposta - ${lead.nomeDevedor.substring(0, 20)}.pdf`,
       },
     });
 
     return NextResponse.json(
-      { success: true, proposta: propostaAtualizada },
+      { success: true, proposta: novaProposta },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
+    console.error('Erro ao gerar PDF:', error);
     return NextResponse.json(
-      { message: "Falha ao gerar o PDF.", error: (error as Error).message },
+      { message: 'Falha ao gerar o PDF.', error: (error as Error).message },
       { status: 500 }
     );
   }
 }
+
