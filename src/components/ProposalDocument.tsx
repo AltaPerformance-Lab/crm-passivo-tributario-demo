@@ -10,8 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Lead, Configuracao } from "@prisma/client";
 
-// --- NOVO: Registro de fontes para negrito/itálico ---
-// O react-pdf precisa que você registre as variações da fonte
+// O registro de fontes permanece o mesmo
 Font.register({
   family: "Helvetica",
   fonts: [
@@ -39,7 +38,7 @@ interface ProposalDocumentProps {
   config: Configuracao;
 }
 
-// --- ESTILOS ATUALIZADOS ---
+// Os estilos permanecem os mesmos
 const styles = StyleSheet.create({
   page: {
     paddingTop: 35,
@@ -101,7 +100,7 @@ const styles = StyleSheet.create({
   },
   text: {
     marginBottom: 5,
-    lineHeight: 1.4, // Altura da linha reduzida
+    lineHeight: 1.4,
     textAlign: "justify",
   },
   footer: {
@@ -128,27 +127,27 @@ export const ProposalDocument = ({
   proposalData,
   config,
 }: ProposalDocumentProps) => {
-  const logoAbsPath = config.logoUrl
-    ? `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}${
-        config.logoUrl
-      }`
-    : null;
+  // --- CORREÇÃO NA LÓGICA DO LOGÓTIPO ---
+  // A URL do Vercel Blob já é um caminho absoluto, não precisamos de adicionar o domínio.
+  const logoAbsPath = config.logoUrl;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
+            {/* Adicionamos uma verificação extra para garantir que a URL do logo não está vazia */}
             {logoAbsPath && <Image style={styles.logo} src={logoAbsPath} />}
           </View>
           <View style={styles.headerRight}>
+            {/* --- CORREÇÃO DE ROBUSTEZ: Adicionamos fallbacks para todos os dados --- */}
             <Text style={styles.companyName}>
               {config.nomeEmpresa || "Nome da Empresa"}
             </Text>
             <Text>CNPJ: {config.cnpj || "Não informado"}</Text>
-            <Text>{config.endereco || "Não informado"}</Text>
+            <Text>{config.endereco || "Endereço não informado"}</Text>
             <Text>
-              Email: {config.email || ""} | Tel: {config.telefone || ""}
+              Email: {config.email || "N/A"} | Tel: {config.telefone || "N/A"}
             </Text>
           </View>
         </View>
@@ -157,7 +156,9 @@ export const ProposalDocument = ({
 
         <View style={styles.clientInfo}>
           <Text style={{ fontWeight: "bold" }}>Para:</Text>
-          <Text>Razão Social: {client.nomeDevedor}</Text>
+          <Text>
+            Razão Social: {client.nomeDevedor || "Cliente não informado"}
+          </Text>
           <Text>CNPJ: {formatCNPJ(client.cnpj)}</Text>
         </View>
 
@@ -165,27 +166,35 @@ export const ProposalDocument = ({
           <Text>Data de Emissão: {new Date().toLocaleDateString("pt-BR")}</Text>
           <Text>
             Válida até:{" "}
-            {new Date(proposalData.validade).toLocaleDateString("pt-BR", {
-              timeZone: "UTC",
-            })}
+            {proposalData.validade
+              ? new Date(proposalData.validade).toLocaleDateString("pt-BR", {
+                  timeZone: "UTC",
+                })
+              : "Não informado"}
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>1. Objeto da Proposta</Text>
-          <Text style={styles.text}>{proposalData.objeto}</Text>
+          <Text style={styles.text}>
+            {proposalData.objeto || "Não informado"}
+          </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>2. Escopo dos Serviços</Text>
-          <Text style={styles.text}>{proposalData.escopo}</Text>
+          <Text style={styles.text}>
+            {proposalData.escopo || "Não informado"}
+          </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             3. Valores e Forma de Pagamento
           </Text>
-          <Text style={styles.text}>{proposalData.valores}</Text>
+          <Text style={styles.text}>
+            {proposalData.valores || "Não informado"}
+          </Text>
         </View>
 
         <Text style={styles.footer}>
