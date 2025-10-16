@@ -37,16 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // --- INÍCIO DO CÓDIGO DE DEPURAÇÃO ---
-    console.log("--- INICIANDO GERAÇÃO DE PDF ---");
-    console.log("Dados do Lead:", JSON.stringify(lead, null, 2));
-    console.log("Dados da Configuração:", JSON.stringify(config, null, 2));
-    console.log(
-      "Dados da Proposta (do formulário):",
-      JSON.stringify(proposalData, null, 2)
-    );
-    console.log("--- TENTANDO RENDERIZAR O DOCUMENTO ---");
-    // --- FIM DO CÓDIGO DE DEPURAÇÃO ---
+    // O código de depuração foi removido daqui.
 
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },

@@ -10,7 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import type { Lead, Configuracao } from "@prisma/client";
 
-// O registro de fontes permanece o mesmo
+// Registro de fontes para negrito/itálico
 Font.register({
   family: "Helvetica",
   fonts: [
@@ -38,7 +38,6 @@ interface ProposalDocumentProps {
   config: Configuracao;
 }
 
-// Os estilos permanecem os mesmos
 const styles = StyleSheet.create({
   page: {
     paddingTop: 35,
@@ -127,27 +126,26 @@ export const ProposalDocument = ({
   proposalData,
   config,
 }: ProposalDocumentProps) => {
-  // --- CORREÇÃO NA LÓGICA DO LOGÓTIPO ---
-  // A URL do Vercel Blob já é um caminho absoluto, não precisamos de adicionar o domínio.
-  const logoAbsPath = config.logoUrl;
+  // A URL do logo do Vercel Blob já é absoluta.
+  // Usamos a URL diretamente, com um fallback para o caso de ela ser nula.
+  const logoUrl = config.logoUrl || null;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* Adicionamos uma verificação extra para garantir que a URL do logo não está vazia */}
-            {logoAbsPath && <Image style={styles.logo} src={logoAbsPath} />}
+            {logoUrl && <Image style={styles.logo} src={logoUrl} />}
           </View>
           <View style={styles.headerRight}>
-            {/* --- CORREÇÃO DE ROBUSTEZ: Adicionamos fallbacks para todos os dados --- */}
             <Text style={styles.companyName}>
               {config.nomeEmpresa || "Nome da Empresa"}
             </Text>
             <Text>CNPJ: {config.cnpj || "Não informado"}</Text>
-            <Text>{config.endereco || "Endereço não informado"}</Text>
+            <Text>{config.endereco || "Não informado"}</Text>
             <Text>
-              Email: {config.email || "N/A"} | Tel: {config.telefone || "N/A"}
+              Email: {config.email || "Não informado"} | Tel:{" "}
+              {config.telefone || "Não informado"}
             </Text>
           </View>
         </View>
@@ -156,9 +154,7 @@ export const ProposalDocument = ({
 
         <View style={styles.clientInfo}>
           <Text style={{ fontWeight: "bold" }}>Para:</Text>
-          <Text>
-            Razão Social: {client.nomeDevedor || "Cliente não informado"}
-          </Text>
+          <Text>Razão Social: {client.nomeDevedor || "Não informado"}</Text>
           <Text>CNPJ: {formatCNPJ(client.cnpj)}</Text>
         </View>
 
