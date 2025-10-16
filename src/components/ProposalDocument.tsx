@@ -34,10 +34,23 @@ interface ProposalData {
   valores: string;
 }
 
+interface SimpleClient {
+  nomeDevedor: string | null;
+  cnpj: string | null;
+}
+
+interface SimpleConfig {
+  nomeEmpresa: string | null;
+  cnpj: string | null;
+  endereco: string | null;
+  email: string | null;
+  telefone: string | null;
+}
+
 interface ProposalDocumentProps {
-  client: Lead;
+  client: SimpleClient;
   proposalData: ProposalData;
-  config: Configuracao;
+  config: SimpleConfig;
 }
 
 // Usamos apenas as fontes padrão (Helvetica) para o teste
