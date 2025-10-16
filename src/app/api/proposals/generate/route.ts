@@ -37,6 +37,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // --- INÍCIO DO CÓDIGO DE DEPURAÇÃO ---
+    console.log("--- INICIANDO GERAÇÃO DE PDF ---");
+    console.log("Dados do Lead:", JSON.stringify(lead, null, 2));
+    console.log("Dados da Configuração:", JSON.stringify(config, null, 2));
+    console.log(
+      "Dados da Proposta (do formulário):",
+      JSON.stringify(proposalData, null, 2)
+    );
+    console.log("--- TENTANDO RENDERIZAR O DOCUMENTO ---");
+    // --- FIM DO CÓDIGO DE DEPURAÇÃO ---
+
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },
       update: {},
@@ -54,12 +65,10 @@ export async function POST(request: Request) {
       config: config,
     });
 
-    // CORREÇÃO FINAL: Geramos o PDF diretamente para um Blob.
     const pdfBlob = await pdf(doc as any).toBlob();
 
     const filename = `proposta-${negocio.id}-${Date.now()}.pdf`;
 
-    // Enviamos o Blob, que é um tipo aceite, para o Vercel Blob
     const blob = await put(filename, pdfBlob, {
       access: "public",
       contentType: "application/pdf",
