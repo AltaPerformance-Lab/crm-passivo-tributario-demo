@@ -25,11 +25,6 @@ interface PdfData {
   logoImageBuffer?: ArrayBuffer;
 }
 
-// ==========================================================
-//                 MELHORIAS DE DESIGN
-// ==========================================================
-// Centralizamos as configurações de design em um objeto "theme"
-// Fica muito mais fácil ajustar cores e fontes no futuro!
 const theme = {
   colors: {
     primary: rgb(0.12, 0.38, 0.57), // Um azul profissional
@@ -45,19 +40,23 @@ const theme = {
   },
   lineHeight: 16,
 };
-// ==========================================================
 
-// Função para formatar o CNPJ
 const formatCNPJ = (cnpj: string | null): string => {
   if (!cnpj) return "CNPJ não informado";
-  // Remove caracteres não numéricos
   const cleaned = cnpj.replace(/\D/g, "");
-  // Aplica a máscara
-  if (cleaned.length !== 14) return cnpj; // Retorna o original se não tiver 14 dígitos
+  if (cleaned.length !== 14) return cnpj;
   return cleaned.replace(
     /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
     "$1.$2.$3/$4-$5"
   );
+};
+
+// Nova função para formatar CPF, se precisar no futuro
+const formatCPF = (cpf: string | null): string => {
+  if (!cpf) return "CPF não informado";
+  const cleaned = cpf.replace(/\D/g, "");
+  if (cleaned.length !== 11) return cpf;
+  return cleaned.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
 };
 
 function wrapText(
@@ -100,23 +99,36 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   const margin = 50;
   let y = height - margin;
 
-  // --- CABEÇALHO REFEITO ---
+  // --- CABEÇALHO COM LOGO MAIOR E CÁLCULO DE ESPAÇO ---
   const headerStartY = y;
-  let logoHeight = 40; // Altura fixa para a logo para consistência
+  const maxLogoHeight = 60; // Nova altura máxima para a logo
+  const maxLogoWidth = 150; // Nova largura máxima para a logo
+  let actualLogoHeight = 0;
 
   if (logoImageBuffer) {
     try {
       const logoImage = await pdfDoc.embedPng(logoImageBuffer);
-      const scale = logoHeight / logoImage.height;
-      const logoWidth = logoImage.width * scale;
+      let scale = 1;
+      if (logoImage.width > maxLogoWidth) {
+        scale = maxLogoWidth / logoImage.width;
+      }
+      if (logoImage.height * scale > maxLogoHeight) {
+        scale = maxLogoHeight / logoImage.height;
+      }
+      const finalLogoWidth = logoImage.width * scale;
+      actualLogoHeight = logoImage.height * scale;
+
       page.drawImage(logoImage, {
         x: margin,
-        y: headerStartY - logoHeight,
-        width: logoWidth,
-        height: logoHeight,
+        y: headerStartY - actualLogoHeight, // Posição exata
+        width: finalLogoWidth,
+        height: actualLogoHeight,
       });
     } catch (e) {
-      console.error("Não foi possível incorporar a imagem.", e);
+      console.error(
+        "Não foi possível incorporar a imagem. Usando texto alternativo.",
+        e
+      );
     }
   }
 
@@ -142,7 +154,6 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     color: theme.colors.text,
   });
   headerTextY -= 12;
-  // CNPJ CORRIGIDO E FORMATADO
   drawRightAlignedText(formatCNPJ(config.cnpj), {
     font: font,
     size: theme.fontSizes.small,
@@ -167,7 +178,8 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     }
   );
 
-  y = headerStartY - logoHeight - 20;
+  y =
+    headerStartY - Math.max(actualLogoHeight, headerStartY - headerTextY) - 20; // Garante que o y está abaixo do maior elemento (logo ou texto)
   page.drawLine({
     start: { x: margin, y: y },
     end: { x: width - margin, y: y },
@@ -202,6 +214,14 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     size: theme.fontSizes.body,
     color: theme.colors.text,
   });
+  y -= 15; // Nova linha para o CNPJ do cliente
+  page.drawText(formatCNPJ(client.cnpj), {
+    x: margin + 35,
+    y: y,
+    font: font,
+    size: theme.fontSizes.body,
+    color: theme.colors.text,
+  }); // CNPJ do cliente
 
   const dates = `Data de Emissão: ${new Date().toLocaleDateString(
     "pt-BR"
@@ -214,9 +234,9 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     size: theme.fontSizes.small,
     color: theme.colors.lightText,
   });
-  y -= 40;
+  y -= 40; // Ajustado para compensar a linha extra do CNPJ do cliente
 
-  // Função de Seção Refeita
+  // Função de Seção
   const drawSection = (title: string, content: string) => {
     page.drawText(title, {
       x: margin,
@@ -258,8 +278,8 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   drawSection("2. Escopo dos Serviços", proposalData.escopo);
   drawSection("3. Valores e Forma de Pagamento", proposalData.valores);
 
-  // --- RODAPÉ REFEITO ---
-  const footerY = margin;
+  // --- RODAPÉ ---
+  const footerY = margin + 20; // Posição levemente mais elevada para melhor espaçamento
   page.drawLine({
     start: { x: margin, y: footerY },
     end: { x: width - margin, y: footerY },
