@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+// Deixamos o prisma comentado para o teste
+// import prisma from "@/lib/prisma";
 
-// ADICIONADO: Força a rota a usar o runtime do Node.js para compatibilidade com o Prisma
+// Mantemos o runtime para consistência
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // Todo o código original foi comentado para o teste.
+  // Apenas retornamos uma resposta simples.
+  return NextResponse.json({ message: "Teste de build da API de CNPJ" });
+
+  /*
   try {
     const body = await request.json();
     const { cnpj } = body;
@@ -148,4 +154,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  */
 }
