@@ -1,6 +1,4 @@
-// src/lib/pdf-generator.ts
-
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, PDFFont } from "pdf-lib";
 
 // Defina as interfaces de dados que a função receberá
 interface SimpleClient {
@@ -23,11 +21,11 @@ interface PdfData {
   proposalData: ProposalData;
 }
 
-// Função para quebrar o texto em linhas para caber na página
+// Função para quebrar o texto em linhas para caber na página (sem alterações aqui)
 function wrapText(
   text: string,
   width: number,
-  font: any,
+  font: PDFFont,
   fontSize: number
 ): string[] {
   const words = text.split(" ");
@@ -94,6 +92,7 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   });
   y -= 40;
 
+  // ==================== AQUI ESTÁ A CORREÇÃO ====================
   // Função auxiliar para desenhar uma seção inteira (título + parágrafo)
   const drawSection = (title: string, content: string) => {
     page.drawText(title, {
@@ -104,13 +103,27 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     });
     y -= 25;
 
-    const lines = wrapText(content, contentWidth, font, 12);
-    lines.forEach((line) => {
-      page.drawText(line, { x: margin, y: y, font, size: 12, lineHeight: 15 });
-      y -= 15; // Move para a próxima linha
+    // 1. Separe o conteúdo pelos "\n" para criar parágrafos
+    const paragraphs = content.split("\n");
+
+    // 2. Para cada parágrafo, aplique a quebra de linha automática
+    paragraphs.forEach((paragraph) => {
+      const lines = wrapText(paragraph, contentWidth, font, 12);
+      lines.forEach((line) => {
+        page.drawText(line, {
+          x: margin,
+          y: y,
+          font,
+          size: 12,
+          lineHeight: 15,
+        });
+        y -= 15; // Move para a próxima linha
+      });
     });
+
     y -= 20; // Espaço extra após a seção
   };
+  // ===============================================================
 
   // Construindo o PDF seção por seção
   drawSection("1. Objeto da Proposta", proposalData.objeto);
