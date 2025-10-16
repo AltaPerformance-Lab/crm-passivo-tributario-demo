@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, PDFFont } from "pdf-lib";
 
+// As interfaces não precisam de alteração
 interface SimpleConfig {
   nomeEmpresa: string | null;
   cnpj: string | null;
@@ -7,7 +8,6 @@ interface SimpleConfig {
   email: string | null;
   telefone: string | null;
 }
-
 interface SimpleClient {
   nomeDevedor: string | null;
   cnpj: string | null;
@@ -18,13 +18,11 @@ interface ProposalData {
   valores: string;
   validade: string;
 }
-
-// ATUALIZADO PARA RECEBER A IMAGEM
 interface PdfData {
   client: SimpleClient;
   config: SimpleConfig;
   proposalData: ProposalData;
-  logoImageBuffer?: ArrayBuffer; // Buffer da imagem é opcional
+  logoImageBuffer?: ArrayBuffer;
 }
 
 function wrapText(
@@ -36,28 +34,27 @@ function wrapText(
   const words = text.replace(/\n/g, " \n ").split(" ");
   let line = "";
   const lines = [];
-
   for (const word of words) {
     if (word === "\n") {
-      lines.push(line);
+      lines.push(line.trim());
       line = "";
       continue;
     }
     const testLine = line + word + " ";
     const testWidth = font.widthOfTextAtSize(testLine, fontSize);
     if (testWidth > width && line.length > 0) {
-      lines.push(line);
+      lines.push(line.trim());
       line = word + " ";
     } else {
       line = testLine;
     }
   }
-  lines.push(line);
+  lines.push(line.trim());
   return lines;
 }
 
 export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
-  const { client, config, proposalData, logoImageBuffer } = data; // Pegando o logoImageBuffer
+  const { client, config, proposalData, logoImageBuffer } = data;
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage();
@@ -66,55 +63,49 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const margin = 50;
-  const contentWidth = width - 2 * margin;
   let y = height - margin;
 
   // ==========================================================
-  //                CABEÇALHO COM LÓGICA DA LOGO
+  //         CABEÇALHO COM LÓGICA DE LAYOUT CORRIGIDA
   // ==========================================================
+  const initialY = y;
+  let logoDims = { width: 0, height: 45 }; // Altura mínima para o texto da direita
+
   if (logoImageBuffer) {
-    // Tenta incorporar a imagem. Assume que é PNG, que é o mais comum para logos.
-    // Se precisar de JPG, troque embedPng por embedJpg.
     try {
       const logoImage = await pdfDoc.embedPng(logoImageBuffer);
-      const desiredWidth = 100; // Largura desejada para a logo
+      const desiredWidth = 100;
       const scale = desiredWidth / logoImage.width;
-      const logoDims = {
-        width: desiredWidth,
-        height: logoImage.height * scale,
-      };
-
-      page.drawImage(logoImage, {
-        x: margin,
-        y: y - logoDims.height + 10, // Ajuste fino da posição vertical
-        width: logoDims.width,
-        height: logoDims.height,
-      });
+      logoDims = { width: desiredWidth, height: logoImage.height * scale };
     } catch (e) {
-      console.error(
-        "Não foi possível incorporar a imagem. Usando texto alternativo.",
-        e
-      );
-      page.drawText("Logótipo da Empresa", {
-        x: margin,
-        y: y,
-        font: font,
-        size: 10,
-        color: rgb(0.5, 0.5, 0.5),
-      });
+      console.error("Não foi possível incorporar a imagem.", e);
     }
+  }
+
+  // Define a altura total do cabeçalho como a altura do maior elemento (logo ou texto)
+  const textBlockHeight = 60; // Altura estimada para o bloco de texto da direita
+  const headerHeight = Math.max(logoDims.height, textBlockHeight);
+
+  // Desenha a logo (se existir) centralizada verticalmente no espaço do cabeçalho
+  if (logoImageBuffer && logoDims.width > 0) {
+    const logoImage = await pdfDoc.embedPng(logoImageBuffer);
+    page.drawImage(logoImage, {
+      x: margin,
+      y: initialY - (headerHeight + logoDims.height) / 2, // Alinha verticalmente
+      width: logoDims.width,
+      height: logoDims.height,
+    });
   } else {
-    // Se não houver imagem, desenha o texto alternativo
     page.drawText("Logótipo da Empresa", {
       x: margin,
-      y: y,
+      y: initialY - 10,
       font: font,
       size: 10,
       color: rgb(0.5, 0.5, 0.5),
     });
   }
 
-  // Coluna da Direita (Dados da Empresa)
+  // Desenha o texto da direita, também alinhado verticalmente
   const drawRightAlignedText = (
     text: string,
     options: { font: PDFFont; size: number; y: number }
@@ -127,30 +118,32 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
       size: options.size,
     });
   };
-  let headerY = y;
+  let headerTextY = initialY - (headerHeight - textBlockHeight) / 2; // Posição Y inicial para alinhar
   drawRightAlignedText(config.nomeEmpresa || "Nome da Empresa", {
     font: boldFont,
     size: 12,
-    y: headerY,
+    y: headerTextY,
   });
-  headerY -= 15;
+  headerTextY -= 15;
   drawRightAlignedText(config.cnpj || "CNPJ não informado", {
     font: font,
     size: 9,
-    y: headerY,
+    y: headerTextY,
   });
-  headerY -= 12;
+  headerTextY -= 12;
   drawRightAlignedText(config.endereco || "Endereço não informado", {
     font: font,
     size: 9,
-    y: headerY,
+    y: headerTextY,
   });
-  headerY -= 12;
+  headerTextY -= 12;
   drawRightAlignedText(
     `Email: ${config.email || ""} | Tel: ${config.telefone || ""}`,
-    { font: font, size: 9, y: headerY }
+    { font: font, size: 9, y: headerTextY }
   );
-  y -= 70;
+
+  // Move o cursor 'y' para baixo do cabeçalho, com base na sua altura calculada
+  y = initialY - headerHeight - 10;
 
   // Linha divisória
   page.drawLine({
@@ -162,8 +155,10 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   y -= 30;
 
   // ==========================================================
-  // O restante do código continua exatamente igual...
+  //                FIM DAS CORREÇÕES DO CABEÇALHO
   // ==========================================================
+
+  // O resto do código continua exatamente igual...
   page.drawText("Proposta de Serviços Jurídicos", {
     x: margin,
     y: y,
@@ -199,7 +194,12 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     y -= 25;
     const paragraphs = content.split("\n");
     paragraphs.forEach((paragraph) => {
-      const lines = wrapText(paragraph.trim(), contentWidth, font, 12);
+      const lines = wrapText(
+        paragraph.trim(),
+        page.getWidth() - 2 * margin,
+        font,
+        12
+      );
       lines.forEach((line) => {
         page.drawText(line, {
           x: margin,
@@ -218,16 +218,21 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   drawSection("2. Escopo dos Serviços", proposalData.escopo);
   drawSection("3. Valores e Forma de Pagamento", proposalData.valores);
 
-  page.drawText(
-    `${config.nomeEmpresa || "Sua Empresa"} - Todos os direitos reservados.`,
-    {
-      x: margin,
-      y: margin / 2,
-      font,
-      size: 8,
-      color: rgb(0.5, 0.5, 0.5),
-    }
-  );
+  // ==========================================================
+  //             RODAPÉ COM ALINHAMENTO CORRIGIDO
+  // ==========================================================
+  const footerText = `${
+    config.nomeEmpresa || "Sua Empresa"
+  } - Todos os direitos reservados.`;
+  const footerTextWidth = font.widthOfTextAtSize(footerText, 8);
+  page.drawText(footerText, {
+    x: (width - footerTextWidth) / 2, // Cálculo para centralizar
+    y: margin / 2,
+    font,
+    size: 8,
+    color: rgb(0.5, 0.5, 0.5),
+  });
+  // ==========================================================
 
   return pdfDoc.save();
 }
