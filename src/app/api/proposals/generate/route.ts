@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
-import { generateProposalPdf } from "@/lib/pdf-generator"; // Verifique se o caminho está correto
+import { generateProposalPdf } from "@/lib/pdf-generator";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Buscando os dados (lógica movida de volta para cá)
     const { leadId, proposalData } = await request.json();
 
     if (!leadId || !proposalData) {
@@ -47,7 +46,23 @@ export async function POST(request: Request) {
       },
     });
 
-    // 2. Preparando os dados para o PDF
+    // ==========================================================
+    //          BUSCANDO A IMAGEM DA LOGO
+    // ==========================================================
+    let logoImageBuffer: ArrayBuffer | undefined = undefined;
+    if (config.logoUrl) {
+      try {
+        const imageResponse = await fetch(config.logoUrl);
+        if (imageResponse.ok) {
+          logoImageBuffer = await imageResponse.arrayBuffer();
+        }
+      } catch (e) {
+        console.error("Falha ao buscar a imagem da logo:", e);
+        // Continua sem a logo se a busca falhar
+      }
+    }
+    // ==========================================================
+
     const plainClient = {
       nomeDevedor: lead.nomeDevedor,
       cnpj: lead.cnpj,
@@ -55,6 +70,10 @@ export async function POST(request: Request) {
 
     const plainConfig = {
       nomeEmpresa: config.nomeEmpresa,
+      cnpj: config.cnpj,
+      endereco: config.endereco,
+      email: config.email,
+      telefone: config.telefone,
     };
 
     const validadeDate = new Date(proposalData.validade);
@@ -62,14 +81,13 @@ export async function POST(request: Request) {
       timeZone: "UTC",
     });
 
-    // 3. Gerando o PDF com a nossa função
     const pdfBytes = await generateProposalPdf({
       client: plainClient,
       config: plainConfig,
       proposalData: { ...proposalData, validade: validadeFormatada },
+      logoImageBuffer: logoImageBuffer, // Enviando a imagem para o gerador
     });
 
-    // 4. Convertendo para Buffer e salvando no Vercel Blob (Correção do Erro 2)
     const pdfBuffer = Buffer.from(pdfBytes);
 
     const filename = `proposta-${negocio.id}-${Date.now()}.pdf`;
@@ -78,7 +96,6 @@ export async function POST(request: Request) {
       contentType: "application/pdf",
     });
 
-    // 5. Salvando a proposta no banco de dados
     await prisma.proposta.create({
       data: {
         negocioId: negocio.id,

@@ -1,43 +1,53 @@
 import { PDFDocument, rgb, StandardFonts, PDFFont } from "pdf-lib";
 
-// Defina as interfaces de dados que a função receberá
+interface SimpleConfig {
+  nomeEmpresa: string | null;
+  cnpj: string | null;
+  endereco: string | null;
+  email: string | null;
+  telefone: string | null;
+}
+
 interface SimpleClient {
   nomeDevedor: string | null;
   cnpj: string | null;
-}
-interface SimpleConfig {
-  nomeEmpresa: string | null;
 }
 interface ProposalData {
   objeto: string;
   escopo: string;
   valores: string;
-  validade: string; // Já vem formatada
+  validade: string;
 }
 
+// ATUALIZADO PARA RECEBER A IMAGEM
 interface PdfData {
   client: SimpleClient;
   config: SimpleConfig;
   proposalData: ProposalData;
+  logoImageBuffer?: ArrayBuffer; // Buffer da imagem é opcional
 }
 
-// Função para quebrar o texto em linhas para caber na página (sem alterações aqui)
 function wrapText(
   text: string,
   width: number,
   font: PDFFont,
   fontSize: number
 ): string[] {
-  const words = text.split(" ");
+  const words = text.replace(/\n/g, " \n ").split(" ");
   let line = "";
   const lines = [];
 
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + " ";
-    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
-    if (testWidth > width) {
+  for (const word of words) {
+    if (word === "\n") {
       lines.push(line);
-      line = words[n] + " ";
+      line = "";
+      continue;
+    }
+    const testLine = line + word + " ";
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+    if (testWidth > width && line.length > 0) {
+      lines.push(line);
+      line = word + " ";
     } else {
       line = testLine;
     }
@@ -47,7 +57,7 @@ function wrapText(
 }
 
 export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
-  const { client, config, proposalData } = data;
+  const { client, config, proposalData, logoImageBuffer } = data; // Pegando o logoImageBuffer
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage();
@@ -57,19 +67,111 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
 
   const margin = 50;
   const contentWidth = width - 2 * margin;
-  let y = height - margin; // O "cursor" que controla a posição vertical
+  let y = height - margin;
 
-  // Título
+  // ==========================================================
+  //                CABEÇALHO COM LÓGICA DA LOGO
+  // ==========================================================
+  if (logoImageBuffer) {
+    // Tenta incorporar a imagem. Assume que é PNG, que é o mais comum para logos.
+    // Se precisar de JPG, troque embedPng por embedJpg.
+    try {
+      const logoImage = await pdfDoc.embedPng(logoImageBuffer);
+      const desiredWidth = 100; // Largura desejada para a logo
+      const scale = desiredWidth / logoImage.width;
+      const logoDims = {
+        width: desiredWidth,
+        height: logoImage.height * scale,
+      };
+
+      page.drawImage(logoImage, {
+        x: margin,
+        y: y - logoDims.height + 10, // Ajuste fino da posição vertical
+        width: logoDims.width,
+        height: logoDims.height,
+      });
+    } catch (e) {
+      console.error(
+        "Não foi possível incorporar a imagem. Usando texto alternativo.",
+        e
+      );
+      page.drawText("Logótipo da Empresa", {
+        x: margin,
+        y: y,
+        font: font,
+        size: 10,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+    }
+  } else {
+    // Se não houver imagem, desenha o texto alternativo
+    page.drawText("Logótipo da Empresa", {
+      x: margin,
+      y: y,
+      font: font,
+      size: 10,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+  }
+
+  // Coluna da Direita (Dados da Empresa)
+  const drawRightAlignedText = (
+    text: string,
+    options: { font: PDFFont; size: number; y: number }
+  ) => {
+    const textWidth = options.font.widthOfTextAtSize(text, options.size);
+    page.drawText(text, {
+      x: width - margin - textWidth,
+      y: options.y,
+      font: options.font,
+      size: options.size,
+    });
+  };
+  let headerY = y;
+  drawRightAlignedText(config.nomeEmpresa || "Nome da Empresa", {
+    font: boldFont,
+    size: 12,
+    y: headerY,
+  });
+  headerY -= 15;
+  drawRightAlignedText(config.cnpj || "CNPJ não informado", {
+    font: font,
+    size: 9,
+    y: headerY,
+  });
+  headerY -= 12;
+  drawRightAlignedText(config.endereco || "Endereço não informado", {
+    font: font,
+    size: 9,
+    y: headerY,
+  });
+  headerY -= 12;
+  drawRightAlignedText(
+    `Email: ${config.email || ""} | Tel: ${config.telefone || ""}`,
+    { font: font, size: 9, y: headerY }
+  );
+  y -= 70;
+
+  // Linha divisória
+  page.drawLine({
+    start: { x: margin, y: y },
+    end: { x: width - margin, y: y },
+    thickness: 1,
+    color: rgb(0.9, 0.9, 0.9),
+  });
+  y -= 30;
+
+  // ==========================================================
+  // O restante do código continua exatamente igual...
+  // ==========================================================
   page.drawText("Proposta de Serviços Jurídicos", {
     x: margin,
     y: y,
     font: boldFont,
     size: 18,
-    color: rgb(0, 0, 0),
   });
-  y -= 40; // Move o cursor para baixo
+  y -= 40;
 
-  // Informações do Cliente
   page.drawText(`Para: ${client.nomeDevedor || "Não informado"}`, {
     x: margin,
     y: y,
@@ -92,23 +194,12 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   });
   y -= 40;
 
-  // ==================== AQUI ESTÁ A CORREÇÃO ====================
-  // Função auxiliar para desenhar uma seção inteira (título + parágrafo)
   const drawSection = (title: string, content: string) => {
-    page.drawText(title, {
-      x: margin,
-      y: y,
-      font: boldFont,
-      size: 14,
-    });
+    page.drawText(title, { x: margin, y: y, font: boldFont, size: 14 });
     y -= 25;
-
-    // 1. Separe o conteúdo pelos "\n" para criar parágrafos
     const paragraphs = content.split("\n");
-
-    // 2. Para cada parágrafo, aplique a quebra de linha automática
     paragraphs.forEach((paragraph) => {
-      const lines = wrapText(paragraph, contentWidth, font, 12);
+      const lines = wrapText(paragraph.trim(), contentWidth, font, 12);
       lines.forEach((line) => {
         page.drawText(line, {
           x: margin,
@@ -117,20 +208,16 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
           size: 12,
           lineHeight: 15,
         });
-        y -= 15; // Move para a próxima linha
+        y -= 15;
       });
     });
-
-    y -= 20; // Espaço extra após a seção
+    y -= 20;
   };
-  // ===============================================================
 
-  // Construindo o PDF seção por seção
   drawSection("1. Objeto da Proposta", proposalData.objeto);
   drawSection("2. Escopo dos Serviços", proposalData.escopo);
   drawSection("3. Valores e Forma de Pagamento", proposalData.valores);
 
-  // Rodapé
   page.drawText(
     `${config.nomeEmpresa || "Sua Empresa"} - Todos os direitos reservados.`,
     {
