@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import type { Lead, LeadStatus } from "@prisma/client";
-import { formatCNPJ } from "@//lib/utils";
+import { formatCNPJ } from "@/lib/utils"; // Corrigido o caminho da importação
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import {
@@ -73,7 +73,7 @@ const LeadRow = ({
         isSelected ? "bg-blue-900/50" : "hover:bg-gray-700"
       }`}
     >
-      <td className="px-5 py-4 border-b border-gray-600 text-center">
+      <td className="px-2 sm:px-5 py-4 border-b border-gray-600 text-center">
         <input
           type="checkbox"
           checked={isSelected}
@@ -82,21 +82,24 @@ const LeadRow = ({
           className="form-checkbox h-5 w-5 bg-gray-800 border-gray-600 rounded text-blue-600 focus:ring-blue-500"
         />
       </td>
-      <td className="px-5 py-4 border-b border-gray-600 text-sm text-center font-semibold text-gray-400">
+      {/* Coluna '#' oculta em ecrãs muito pequenos */}
+      <td className="hidden sm:table-cell px-2 sm:px-5 py-4 border-b border-gray-600 text-sm text-center font-semibold text-gray-400">
         {itemNumber}
       </td>
-      <td className="px-5 py-4 border-b border-gray-600 text-sm">
-        <p className="font-semibold whitespace-nowrap">{lead.nomeDevedor}</p>
+      <td className="px-2 sm:px-5 py-4 border-b border-gray-600 text-sm">
+        {/* Removido 'whitespace-nowrap' e adicionado 'break-words' para permitir a quebra de linha */}
+        <p className="font-semibold break-words">{lead.nomeDevedor}</p>
         {lead.nomeFantasia && (
-          <p className="text-gray-400 text-xs whitespace-nowrap">
+          <p className="text-gray-400 text-xs break-words">
             {lead.nomeFantasia}
           </p>
         )}
       </td>
-      <td className="px-5 py-4 border-b border-gray-600 text-sm font-mono">
+      {/* Coluna CNPJ oculta em ecrãs pequenos e médios */}
+      <td className="hidden lg:table-cell px-5 py-4 border-b border-gray-600 text-sm font-mono">
         {formatCNPJ(lead.cnpj)}
       </td>
-      <td className="px-5 py-4 border-b border-gray-600 text-sm">
+      <td className="px-2 sm:px-5 py-4 border-b border-gray-600 text-sm">
         <span
           className={`relative inline-block px-3 py-1 font-semibold leading-tight ${colors.text}`}
         >
@@ -104,12 +107,12 @@ const LeadRow = ({
             aria-hidden
             className={`absolute inset-0 ${colors.bg} opacity-50 rounded-full`}
           ></span>
-          <span className="relative text-xs">
+          <span className="relative text-xs whitespace-nowrap">
             {lead.status.replace(/_/g, " ")}
           </span>
         </span>
       </td>
-      <td className="px-5 py-4 border-b border-gray-600 text-sm text-right font-semibold text-red-400">
+      <td className="px-2 sm:px-5 py-4 border-b border-gray-600 text-sm text-right font-semibold text-red-400 whitespace-nowrap">
         {lead.valorTotalDivida.toLocaleString("pt-BR", {
           style: "currency",
           currency: "BRL",
@@ -137,13 +140,14 @@ const Pagination = ({
   };
 
   return (
-    <div className="flex justify-center items-center gap-4 text-sm">
+    <div className="flex justify-center items-center gap-2 sm:gap-4 text-xs sm:text-sm">
       <button
         onClick={() => router.push(createPageURL(currentPage - 1))}
         disabled={currentPage <= 1}
         className="flex items-center gap-1 px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <ChevronLeft size={16} /> Anterior
+        <ChevronLeft size={16} />{" "}
+        <span className="hidden sm:inline">Anterior</span>
       </button>
       <span>
         Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
@@ -153,7 +157,8 @@ const Pagination = ({
         disabled={currentPage >= totalPages}
         className="flex items-center gap-1 px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Próxima <ChevronRight size={16} />
+        <span className="hidden sm:inline">Próxima</span>{" "}
+        <ChevronRight size={16} />
       </button>
     </div>
   );
@@ -320,50 +325,54 @@ export default function LeadsTable() {
   };
 
   return (
-    <div>
+    <div className="p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <Link href="/">
-          <h1 className="text-3xl font-bold hover:text-blue-400 transition-colors">
+          <h1 className="text-2xl sm:text-3xl font-bold hover:text-blue-400 transition-colors">
             Painel de Leads
           </h1>
         </Link>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           <Link
             href="/importar"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 sm:px-4 rounded flex items-center gap-2 text-sm"
           >
-            <Upload size={18} /> Importar CSV
+            <Upload size={18} />{" "}
+            <span className="hidden sm:inline">Importar CSV</span>
           </Link>
           <button
             onClick={handleBulkEnrich}
             disabled={isBulkEnriching || isLoading}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed"
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-3 sm:px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed text-sm"
           >
             {isBulkEnriching ? (
               <Loader2 className="animate-spin" />
             ) : (
               <Sparkles size={18} />
             )}{" "}
-            Enriquecer Página
+            <span className="hidden sm:inline">Enriquecer Página</span>
           </button>
           <button
             onClick={handleExport}
             disabled={selectedLeadIds.size === 0 || isBulkEnriching}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed"
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 sm:px-4 rounded flex items-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed text-sm"
           >
-            <Download size={18} /> Exportar ({selectedLeadIds.size})
+            <Download size={18} />{" "}
+            <span className="hidden sm:inline">Exportar</span> (
+            {selectedLeadIds.size})
           </button>
           <Link
             href="/dashboard"
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 sm:px-4 rounded flex items-center gap-2 text-sm"
           >
-            <ChartIcon size={18} /> Ver Métricas
+            <ChartIcon size={18} />{" "}
+            <span className="hidden sm:inline">Ver Métricas</span>
           </Link>
           <Link
             href="/configuracoes"
             className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded flex items-center gap-2"
           >
-            <Settings size={18} /> Configurações
+            <Settings size={18} />
           </Link>
           <LogoutButton />
         </div>
@@ -388,13 +397,13 @@ export default function LeadsTable() {
 
       <UpcomingReminders />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         <input
           type="text"
           defaultValue={searchTerm}
           onBlur={(e) => handleFilterChange("search", e.target.value)}
           placeholder="Buscar por Nome ou CNPJ..."
-          className="md:col-span-2 px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="lg:col-span-2 px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <select
           value={statusFilter}
@@ -434,7 +443,7 @@ export default function LeadsTable() {
           ))}
         </select>
 
-        <div className="flex items-center gap-2 bg-gray-700 px-4 py-2 border border-gray-600 rounded-lg md:col-span-5">
+        <div className="flex items-center gap-2 bg-gray-700 px-4 py-2 border border-gray-600 rounded-lg md:col-span-2 lg:col-span-5">
           <label className="text-sm text-gray-400">Ordenar por:</label>
           <button
             onClick={() => handleFilterChange("sortOrder", "desc")}
@@ -460,10 +469,10 @@ export default function LeadsTable() {
       </div>
 
       <div className="bg-gray-800 shadow-md rounded-lg overflow-x-auto">
-        <table className="min-w-full leading-normal">
+        <table className="w-full leading-normal">
           <thead>
-            <tr className="bg-gray-700 text-gray-300 uppercase text-sm">
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-center">
+            <tr className="bg-gray-700 text-gray-300 uppercase text-xs sm:text-sm">
+              <th className="px-2 sm:px-5 py-3 border-b-2 border-gray-600 text-center">
                 <input
                   type="checkbox"
                   onChange={handleSelectAll}
@@ -473,19 +482,19 @@ export default function LeadsTable() {
                   className="form-checkbox h-5 w-5 bg-gray-800 border-gray-600 rounded text-blue-600 focus:ring-blue-500"
                 />
               </th>
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-left w-12">
+              <th className="hidden sm:table-cell px-2 sm:px-5 py-3 border-b-2 border-gray-600 text-left">
                 #
               </th>
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+              <th className="px-2 sm:px-5 py-3 border-b-2 border-gray-600 text-left">
                 Nome do Devedor
               </th>
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+              <th className="hidden lg:table-cell px-5 py-3 border-b-2 border-gray-600 text-left">
                 CNPJ
               </th>
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-left">
+              <th className="px-2 sm:px-5 py-3 border-b-2 border-gray-600 text-left">
                 Status
               </th>
-              <th className="px-5 py-3 border-b-2 border-gray-600 text-right">
+              <th className="px-2 sm:px-5 py-3 border-b-2 border-gray-600 text-right">
                 Valor da Dívida
               </th>
             </tr>

@@ -5,12 +5,13 @@ import {
   View,
   Document,
   StyleSheet,
-  Image,
-  Font,
+  // Image, // Desativado para teste
+  // Font, // Desativado para teste
 } from "@react-pdf/renderer";
 import type { Lead, Configuracao } from "@prisma/client";
 
-// Registro de fontes para negrito/itálico
+/*
+// --- FONTES EXTERNAS DESATIVADAS PARA TESTE ---
 Font.register({
   family: "Helvetica",
   fonts: [
@@ -24,6 +25,7 @@ Font.register({
     },
   ],
 });
+*/
 
 interface ProposalData {
   validade: string;
@@ -38,12 +40,13 @@ interface ProposalDocumentProps {
   config: Configuracao;
 }
 
+// Usamos apenas as fontes padrão (Helvetica) para o teste
 const styles = StyleSheet.create({
   page: {
     paddingTop: 35,
     paddingBottom: 65,
     paddingHorizontal: 35,
-    fontFamily: "Helvetica",
+    fontFamily: "Helvetica", // Fonte padrão
     fontSize: 10,
     color: "#333333",
   },
@@ -126,16 +129,16 @@ export const ProposalDocument = ({
   proposalData,
   config,
 }: ProposalDocumentProps) => {
-  // A URL do logo do Vercel Blob já é absoluta.
-  // Usamos a URL diretamente, com um fallback para o caso de ela ser nula.
-  const logoUrl = config.logoUrl || null;
+  // const logoUrl = config.logoUrl || null; // Desativado para teste
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {logoUrl && <Image style={styles.logo} src={logoUrl} />}
+            {/* O logótipo foi removido para o teste */}
+            {/* {logoUrl && <Image style={styles.logo} src={logoUrl} />} */}
+            <Text>Logótipo da Empresa</Text>
           </View>
           <View style={styles.headerRight}>
             <Text style={styles.companyName}>
