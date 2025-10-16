@@ -1,39 +1,7 @@
 import React from "react";
-import {
-  Page,
-  Text,
-  View,
-  Document,
-  StyleSheet,
-  // Image, // Desativado para teste
-  // Font, // Desativado para teste
-} from "@react-pdf/renderer";
-import type { Lead, Configuracao } from "@prisma/client";
+import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer";
 
-/*
-// --- FONTES EXTERNAS DESATIVADAS PARA TESTE ---
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    {
-      src: "https://fonts.cdnfonts.com/s/13057/Helvetica.woff",
-      fontWeight: "normal",
-    },
-    {
-      src: "https://fonts.cdnfonts.com/s/13057/Helvetica-Bold.woff",
-      fontWeight: "bold",
-    },
-  ],
-});
-*/
-
-interface ProposalData {
-  validade: string;
-  objeto: string;
-  escopo: string;
-  valores: string;
-}
-
+// TIPOS SIMPLIFICADOS PARA CORRIGIR O ERRO
 interface SimpleClient {
   nomeDevedor: string | null;
   cnpj: string | null;
@@ -47,19 +15,26 @@ interface SimpleConfig {
   telefone: string | null;
 }
 
+interface ProposalData {
+  validade: string;
+  objeto: string;
+  escopo: string;
+  valores: string;
+}
+
+// PROPS ATUALIZADAS PARA USAR OS TIPOS SIMPLES
 interface ProposalDocumentProps {
   client: SimpleClient;
   proposalData: ProposalData;
   config: SimpleConfig;
 }
 
-// Usamos apenas as fontes padrão (Helvetica) para o teste
 const styles = StyleSheet.create({
   page: {
     paddingTop: 35,
     paddingBottom: 65,
     paddingHorizontal: 35,
-    fontFamily: "Helvetica", // Fonte padrão
+    fontFamily: "Helvetica",
     fontSize: 10,
     color: "#333333",
   },
@@ -85,10 +60,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     color: "#000000",
-  },
-  logo: {
-    width: 70,
-    height: "auto",
   },
   mainTitle: {
     fontSize: 18,
@@ -142,15 +113,11 @@ export const ProposalDocument = ({
   proposalData,
   config,
 }: ProposalDocumentProps) => {
-  // const logoUrl = config.logoUrl || null; // Desativado para teste
-
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* O logótipo foi removido para o teste */}
-            {/* {logoUrl && <Image style={styles.logo} src={logoUrl} />} */}
             <Text>Logótipo da Empresa</Text>
           </View>
           <View style={styles.headerRight}>
@@ -176,14 +143,8 @@ export const ProposalDocument = ({
 
         <View style={styles.section}>
           <Text>Data de Emissão: {new Date().toLocaleDateString("pt-BR")}</Text>
-          <Text>
-            Válida até:{" "}
-            {proposalData.validade
-              ? new Date(proposalData.validade).toLocaleDateString("pt-BR", {
-                  timeZone: "UTC",
-                })
-              : "Não informado"}
-          </Text>
+          {/* LÓGICA DE DATA SIMPLIFICADA */}
+          <Text>Válida até: {proposalData.validade || "Não informado"}</Text>
         </View>
 
         <View style={styles.section}>

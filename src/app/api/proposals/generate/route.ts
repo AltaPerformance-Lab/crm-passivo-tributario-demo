@@ -5,6 +5,7 @@ import { pdf } from "@react-pdf/renderer";
 import { ProposalDocument } from "@/components/ProposalDocument";
 import React from "react";
 import { auth } from "../../../../../auth";
+import type { Lead, Configuracao } from "@prisma/client"; // Import types if needed
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,6 @@ export async function POST(request: Request) {
     }
 
     // Crie objetos "planos" com apenas os dados necessários para o PDF.
-    // Isso evita passar tipos complexos do Prisma (como Date) para o renderer.
     const plainClient = {
       nomeDevedor: lead.nomeDevedor,
       cnpj: lead.cnpj,
@@ -52,6 +52,18 @@ export async function POST(request: Request) {
       telefone: config.telefone,
     };
 
+    // Formate a data ANTES de enviar para o componente
+    const validadeDate = new Date(proposalData.validade);
+    const validadeFormatada = validadeDate.toLocaleDateString("pt-BR", {
+      timeZone: "UTC", // Garante que a data não mude por fuso horário
+    });
+
+    // Atualiza o objeto proposalData com a data já formatada como string
+    const finalProposalData = {
+      ...proposalData,
+      validade: validadeFormatada,
+    };
+
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },
       update: {},
@@ -63,11 +75,11 @@ export async function POST(request: Request) {
       },
     });
 
-    // Use os objetos planos em vez dos objetos completos do Prisma
+    // Use os objetos planos e os dados finais da proposta
     const doc = React.createElement(ProposalDocument, {
-      client: plainClient, // Corrigido
-      proposalData: proposalData,
-      config: plainConfig, // Corrigido
+      client: plainClient,
+      proposalData: finalProposalData,
+      config: plainConfig,
     });
 
     const pdfBlob = await pdf(doc as any).toBlob();
@@ -85,7 +97,7 @@ export async function POST(request: Request) {
         objeto: proposalData.objeto,
         escopo: proposalData.escopo,
         valores: proposalData.valores,
-        validade: new Date(proposalData.validade),
+        validade: new Date(proposalData.validade), // Salva a data original no BD
         caminhoArquivo: blob.url,
         nomeArquivo: `Proposta - ${lead.nomeDevedor.substring(0, 20)}.pdf`,
       },
