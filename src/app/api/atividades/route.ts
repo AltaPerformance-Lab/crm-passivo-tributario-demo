@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 
-// ADICIONADO: Força a rota a usar o runtime do Node.js
+// Deixamos o prisma comentado para o teste
+// import prisma from "@/lib/prisma";
+
+// Mantemos o runtime para consistência
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  // Todo o código original foi comentado para o teste.
+  // Apenas retornamos uma resposta simples.
+  return NextResponse.json({ message: "Teste de build da API de Atividades" });
+
+  /*
   try {
     const { leadId, conteudo } = await request.json();
 
@@ -30,4 +37,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  */
 }
