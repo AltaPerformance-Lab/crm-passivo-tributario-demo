@@ -37,7 +37,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // O código de depuração foi removido daqui.
+    // ======================= LOGS PARA DEPURACAO =======================
+    // Aqui verificamos os tipos de dados antes de passá-los para o componente PDF.
+    console.log("--- INÍCIO DEBUG PDF ---");
+    console.log("Verificando os tipos de dados de 'proposalData':");
+    console.log(`Tipo de 'objeto': ${typeof proposalData.objeto}`);
+    console.log(`Tipo de 'escopo': ${typeof proposalData.escopo}`);
+    console.log(`Tipo de 'valores': ${typeof proposalData.valores}`);
+
+    // Este log mostrará a estrutura completa do objeto.
+    // Se for um JSON de um editor de texto, você verá aqui.
+    console.log(
+      "Conteúdo completo de 'proposalData':",
+      JSON.stringify(proposalData, null, 2)
+    );
+    console.log("--- FIM DEBUG PDF ---");
+    // ===================================================================
 
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },
@@ -82,7 +97,8 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
+    // O erro será capturado aqui e logado nos logs da Vercel
+    console.error("ERRO DETALHADO AO GERAR PDF:", error);
     return NextResponse.json(
       { message: "Falha ao gerar o PDF.", error: (error as Error).message },
       { status: 500 }
