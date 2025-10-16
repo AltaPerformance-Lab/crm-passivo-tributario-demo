@@ -7,29 +7,7 @@ export const runtime = "nodejs";
 
 // Função GET: Busca a configuração atual no banco de dados
 export async function GET() {
-  // --- INÍCIO DO CÓDIGO DE DEPURAÇÃO ---
-  // Vamos imprimir a variável de ambiente para ver o que a Vercel está realmente a fornecer.
-  console.log("--- INICIANDO TESTE DE VARIÁVEL DE AMBIENTE ---");
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    console.error(
-      "ERRO CRÍTICO: A variável DATABASE_URL está indefinida ou vazia!"
-    );
-  } else {
-    console.log("DATABASE_URL recebida:", databaseUrl);
-    // Vamos verificar se a string é válida
-    if (databaseUrl.startsWith("postgresql://")) {
-      console.log("Validação do protocolo: OK");
-    } else {
-      console.error(
-        "Validação do protocolo: FALHOU! A URL não começa com 'postgresql://'"
-      );
-    }
-  }
-  console.log("--- FIM DO TESTE DE VARIÁVEL DE AMBIENTE ---");
-  // --- FIM DO CÓDIGO DE DEPURAÇÃO ---
-
+  // O código de depuração foi removido.
   try {
     const config = await prisma.configuracao.upsert({
       where: { id: 1 },
