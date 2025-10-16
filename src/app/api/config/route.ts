@@ -3,13 +3,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+// ADICIONADO: Força a rota a usar o runtime do Node.js
 export const runtime = "nodejs";
 
 // Função GET: Busca a configuração atual no banco de dados
 export async function GET() {
   try {
-    // Usamos upsert para garantir que sempre exista um registro de configuração.
-    // Se não encontrar o registro com id: 1, ele cria um vazio.
     const config = await prisma.configuracao.upsert({
       where: { id: 1 },
       update: {},
@@ -36,8 +35,6 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const data = await request.json();
-
-    // Remove o ID dos dados para evitar erros de atualização
     const { id, ...updateData } = data;
 
     const updatedConfig = await prisma.configuracao.update({
