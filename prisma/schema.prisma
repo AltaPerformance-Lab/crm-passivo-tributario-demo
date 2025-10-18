@@ -7,22 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Definição dos ENUMS
 enum Role {
   ADMIN
   USER
-}
-
-model User {
-  id           String         @id @default(cuid())
-  name         String?
-  email        String?        @unique
-  password     String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  role         Role           @default(USER)
-  leads        Lead[]
-  negocios     Negocio[]
-  configuracao Configuracao?
 }
 
 enum LeadStatus {
@@ -35,6 +23,137 @@ enum LeadStatus {
   CONVERTIDO
   DESCARTADO
 }
+
+
+// --- MODELOS PRINCIPAIS ---
+
+model User {
+  id           String         @id @default(cuid())
+  name         String?
+  email        String?        @unique
+  password     String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  role         Role           @default(USER)
+  
+  // Relações
+  leads        Lead[]
+  negocios     Negocio[]
+  configuracao Configuracao?
+}
+
+model Lead {
+  id               String     @id @default(cuid())
+  cnpj             String
+  nomeDevedor      String
+  nomeFantasia     String?
+  valorTotalDivida Float
+  status           LeadStatus @default(A_VERIFICAR)
+  municipio        String?    // Campo usado no filtro
+  uf               String?    // Campo usado no filtro
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  // Relações
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  empresaId        Int?       @unique
+  empresa          Empresa?   @relation(fields: [empresaId], references: [id], onUpdate: NoAction, onDelete: SetNull)
+
+  negocio          Negocio?
+  atividades       Atividade[]
+  lembretes        Lembrete[]
+  
+  // Índices e Constraints
+  @@unique([cnpj, userId])
+  @@index([userId])
+  @@index([nomeDevedor])
+  @@index([municipio])
+  @@index([status])
+}
+
+model Negocio {
+  id                String     @id @default(cuid())
+  valorFechado      Float
+  valorEscritorio   Float      @default(0)
+  valorOutraParte   Float
+  valorRecebido     Float
+  dataFechamento    DateTime   @default(now())
+  
+  // Relações
+  lead              Lead       @relation(fields: [leadId], references: [id])
+  leadId            String     @unique
+  
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  propostas         Proposta[]
+
+  // Índices
+  @@index([userId])
+}
+
+model Proposta {
+  id             String    @id @default(cuid())
+  objeto         String?
+  escopo         String?   @db.Text
+  valores        String?   @db.Text
+  validade       DateTime?
+  nomeArquivo    String?
+  caminhoArquivo String
+  createdAt      DateTime  @default(now())
+  
+  // Relações
+  negocio        Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId      String
+}
+
+
+// --- MODELOS DE SUPORTE ---
+
+model Configuracao {
+  id          String  @id @default(cuid())
+  nomeEmpresa String?
+  cnpj        String?
+  endereco    String?
+  email       String?
+  telefone    String?
+  logoUrl     String?
+
+  // Relações
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Índices
+  @@index([userId])
+}
+
+model Atividade {
+  id        String   @id @default(cuid())
+  conteudo  String   @db.Text
+  criadoEm  DateTime @default(now())
+  
+  // Relações
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+}
+
+model Lembrete {
+  id        String   @id @default(cuid())
+  data      DateTime
+  descricao String
+  concluido Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+  
+  // Relações
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+}
+
+
+// --- MODELOS DE ENRIQUECIMENTO (DADOS EXTERNOS) ---
+// Estes modelos não precisam de relação com User.
 
 model Empresa {
   id                      Int       @id @default(autoincrement())
@@ -59,6 +178,8 @@ model Empresa {
   cnaesSecundarios        Json?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+
+  // Relações
   socios                  Socio[]
   contatos                Contato[]
   lead                    Lead?
@@ -67,7 +188,11 @@ model Empresa {
 model Socio {
   id                     Int      @id @default(autoincrement())
   nomeSocio              String
-  // ... outros campos ...
+  qualificacaoSocio      String
+  dataEntradaSociedade   String?
+  documento              String?
+
+  // Relações
   empresa                Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empresaId              Int
 }
@@ -75,93 +200,13 @@ model Socio {
 model Contato {
   id         Int      @id @default(autoincrement())
   nome       String
-  // ... outros campos ...
+  cargo      String?
+  telefone   String?
+  email      String?
+  observacao String?
+  createdAt  DateTime @default(now())
+
+  // Relações
   empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empresaId  Int
-}
-
-model Lead {
-  id               String     @id @default(cuid()) // PADRONIZADO para String
-  cnpj             String
-  nomeDevedor      String
-  nomeFantasia     String?
-  valorTotalDivida Float
-  status           LeadStatus @default(A_VERIFICAR)
-  municipio        String?
-  uf               String?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  empresaId        Int?       @unique
-  empresa          Empresa?   @relation(fields: [empresaId], references: [id])
-  negocio          Negocio?
-  atividades       Atividade[]
-  lembretes        Lembrete[]
-  userId           String
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@unique([cnpj, userId])
-  @@index([userId])      // ADICIONADO: Para performance
-  @@index([nomeDevedor])
-  @@index([municipio])
-}
-
-model Negocio {
-  id                String     @id @default(cuid()) // PADRONIZADO para String
-  valorFechado      Float
-  valorEscritorio   Float      @default(0)
-  valorOutraParte   Float
-  valorRecebido     Float
-  dataFechamento    DateTime   @default(now())
-  lead              Lead       @relation(fields: [leadId], references: [id])
-  leadId            String     @unique // PADRONIZADO para String
-  propostas         Proposta[]
-  userId            String
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])      // ADICIONADO: Para performance
-}
-
-model Proposta {
-  id             String    @id @default(cuid()) // PADRONIZADO para String
-  objeto         String?
-  escopo         String?   @db.Text
-  valores        String?   @db.Text
-  validade       DateTime?
-  nomeArquivo    String?
-  caminhoArquivo String
-  createdAt      DateTime  @default(now())
-  negocio        Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId      String    // PADRONIZADO para String
-}
-
-model Configuracao {
-  id          String  @id @default(cuid()) // PADRONIZADO para String
-  nomeEmpresa String?
-  cnpj        String?
-  endereco    String?
-  email       String?
-  telefone    String?
-  logoUrl     String?
-  userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId]) // ADICIONADO: Para performance
-}
-
-model Atividade {
-  id        String   @id @default(cuid()) // PADRONIZADO para String
-  conteudo  String   @db.Text
-  criadoEm  DateTime @default(now())
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadId    String   // PADRONIZADO para String
-}
-
-model Lembrete {
-  id        String   @id @default(cuid()) // PADRONIZADO para String
-  data      DateTime
-  descricao String
-  concluido Boolean  @default(false)
-  criadoEm  DateTime @default(now())
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadId    String   // PADRONIZADO para String
 }
