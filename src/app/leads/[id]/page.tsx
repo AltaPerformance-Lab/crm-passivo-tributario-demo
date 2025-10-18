@@ -1,3 +1,5 @@
+// src/app/leads/[id]/page.tsx (Versão Segura)
+
 import { PrismaClient, Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { formatCNPJ, formatPhone } from "@/lib/utils";
@@ -11,46 +13,36 @@ import ProposalManager from "@/components/ProposalManager";
 import ActivityManager from "@/components/ActivityManager";
 import CollapsibleCard from "@/components/CollapsibleCard";
 import ReminderManager from "@/components/ReminderManager";
+import { auth } from "../../../../auth";
 
 const prisma = new PrismaClient();
 
-// Tipo atualizado para incluir todas as relações
 const leadWithDetails = Prisma.validator<Prisma.LeadDefaultArgs>()({
   include: {
-    empresa: {
-      include: {
-        socios: true,
-        contatos: true,
-      },
-    },
-    negocio: {
-      include: {
-        propostas: true,
-      },
-    },
+    empresa: { include: { socios: true, contatos: true } },
+    negocio: { include: { propostas: true } },
     atividades: true,
     lembretes: true,
   },
 });
 type LeadWithDetails = Prisma.LeadGetPayload<typeof leadWithDetails>;
 
-async function getLeadDetails(id: number): Promise<LeadWithDetails | null> {
-  const lead = await prisma.lead.findUnique({
-    where: { id: id },
+// 2. A função de busca agora EXIGE o userId para garantir a segurança
+async function getLeadDetails(
+  id: number,
+  userId: string
+): Promise<LeadWithDetails | null> {
+  const lead = await prisma.lead.findFirst({
+    // Usamos findFirst para a busca composta
+    where: {
+      id: id,
+      userId: userId, // <-- Filtro de segurança
+    },
     include: {
-      empresa: {
-        include: {
-          socios: true,
-          contatos: true,
-        },
-      },
-      negocio: {
-        include: {
-          propostas: true,
-        },
-      },
-      atividades: true,
-      lembretes: true,
+      empresa: { include: { socios: true, contatos: true } },
+      negocio: { include: { propostas: true } },
+      atividades: { orderBy: { criadoEm: "desc" } }, // Boa prática: ordenar atividades
+      lembretes: { orderBy: { data: "asc" } }, // Boa prática: ordenar lembretes
     },
   });
   if (!lead) return null;
@@ -79,15 +71,27 @@ export default async function LeadDetailPage({
 }: {
   params: { id: string };
 }) {
+  // 3. Obtemos a sessão diretamente no Server Component
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    // Se por algum motivo não houver sessão, nega o acesso.
+    // O middleware já deve ter feito isso, mas é uma camada extra de segurança.
+    notFound();
+  }
+
   const leadId = parseInt(params.id, 10);
-  const lead = await getLeadDetails(leadId);
+  // 4. Passamos o userId para a função de busca
+  const lead = await getLeadDetails(leadId, userId);
 
   if (!lead) {
-    notFound();
+    notFound(); // Se o lead não existe OU não pertence ao usuário, a página não é encontrada
   }
 
   const empresa = lead.empresa;
 
+  // O resto do seu JSX continua exatamente o mesmo, pois ele já recebe o 'lead' correto e seguro
   return (
     <main className="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -96,8 +100,6 @@ export default async function LeadDetailPage({
             &larr; Voltar para a lista
           </Link>
         </div>
-
-        {/* Card de Identificação, Status e Dívida */}
         <div className="bg-gray-800 shadow-md rounded-lg p-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-4">
             <div>
@@ -115,7 +117,6 @@ export default async function LeadDetailPage({
               />
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <InfoCard title="CNPJ" value={formatCNPJ(lead.cnpj)} />
             <StatusUpdater leadId={lead.id} currentStatus={lead.status} />
@@ -136,8 +137,6 @@ export default async function LeadDetailPage({
             <ProposalManager lead={lead} />
           </div>
         </div>
-
-        {/* LAYOUT REORGANIZADO E COM CARDS SANFONA */}
         {empresa && (
           <>
             <CollapsibleCard title="Gestão de Contatos">
@@ -146,17 +145,14 @@ export default async function LeadDetailPage({
                 empresaId={empresa.id}
               />
             </CollapsibleCard>
-
             <CollapsibleCard title="Histórico de Atividades">
               <ActivityManager leadId={lead.id} atividades={lead.atividades} />
             </CollapsibleCard>
-
             <CollapsibleCard title="Lembretes">
               <ReminderManager leadId={lead.id} lembretes={lead.lembretes} />
             </CollapsibleCard>
           </>
         )}
-
         <CollapsibleCard title="Dados Cadastrais">
           {empresa ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -208,12 +204,10 @@ export default async function LeadDetailPage({
             </div>
           ) : (
             <p className="text-gray-400 text-center py-4">
-              Clique em "Enriquecer Dados" no card principal para carregar estas
-              informações.
+              Clique em "Enriquecer Dados" para carregar estas informações.
             </p>
           )}
         </CollapsibleCard>
-
         {empresa && (
           <>
             <CollapsibleCard title="Atividades Econômicas (CNAE)">
@@ -236,7 +230,6 @@ export default async function LeadDetailPage({
                 </div>
               </div>
             </CollapsibleCard>
-
             <CollapsibleCard title="Quadro de Sócios">
               <div className="space-y-2">
                 {empresa.socios.map((socio) => (
@@ -267,13 +260,10 @@ export default async function LeadDetailPage({
             </CollapsibleCard>
           </>
         )}
-
-        {/* Mensagem para leads não enriquecidos */}
         {!empresa && (
           <div className="bg-gray-800 shadow-md rounded-lg p-6 text-center text-gray-400">
             <p>
-              Clique em "Enriquecer Dados" no card principal para carregar os
-              detalhes do lead.
+              Clique em "Enriquecer Dados" para carregar os detalhes do lead.
             </p>
           </div>
         )}

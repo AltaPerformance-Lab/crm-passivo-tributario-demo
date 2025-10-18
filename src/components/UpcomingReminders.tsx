@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // Importa o useRouter
 import Link from "next/link";
 import {
   BellRing,
@@ -10,7 +11,7 @@ import {
   Check,
   History,
 } from "lucide-react";
-import type { Lembrete, Lead } from "@prisma/client";
+import type { Lembrete } from "@prisma/client";
 import CollapsibleCard from "./CollapsibleCard";
 
 type ReminderWithLead = Lembrete & {
@@ -24,8 +25,10 @@ export default function UpcomingReminders() {
   const [reminders, setReminders] = useState<ReminderWithLead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const router = useRouter(); // Instancia o router
 
   const fetchReminders = async () => {
+    // Evita o piscar do 'loading' em revalidações, mas mostra na primeira carga
     if (reminders.length === 0) setIsLoading(true);
     try {
       const response = await fetch("/api/lembretes/upcoming");
@@ -65,9 +68,15 @@ export default function UpcomingReminders() {
       });
 
       if (!response.ok) throw new Error("Falha ao atualizar lembrete");
+
+      // A atualização otimista na UI é ótima, mantemos ela.
       setReminders((prev) => prev.filter((r) => r.id !== reminderId));
+
+      // ADICIONADO: Garante que o resto da página seja atualizado.
+      router.refresh();
     } catch (error) {
       console.error(`Erro ao ${action} o lembrete`, error);
+      // Se der erro, busca a lista completa para garantir consistência.
       fetchReminders();
     } finally {
       setBusyId(null);
@@ -95,7 +104,6 @@ export default function UpcomingReminders() {
     now.setHours(0, 0, 0, 0);
 
     return (
-      // --- MUDANÇA APLICADA AQUI: Adicionado xl:grid-cols-4 ---
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {reminders.map((reminder) => {
           const reminderDate = new Date(reminder.data);

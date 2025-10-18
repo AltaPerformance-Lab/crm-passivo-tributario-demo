@@ -1,15 +1,24 @@
-// src/app/api/leads/import/route.ts
+// src/app/api/leads/import/route.ts (Versão Segura e Corrigida)
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "../../../../../auth"; // 1. Importamos a função de autenticação
+
 import type { Lead } from "@prisma/client";
 
-// Definindo o tipo de dado que esperamos receber
-type LeadInput = Omit<Lead, "id" | "createdAt" | "updatedAt">;
+type LeadInput = Omit<Lead, "id" | "createdAt" | "updatedAt" | "userId">;
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  // Adicionamos a verificação de segurança no início da função
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
   try {
     const leads: LeadInput[] = await request.json();
 
@@ -20,21 +29,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Usamos uma transação para fazer todos os 'upserts' de uma vez.
-    // Isso é muito mais performático do que um loop com chamadas individuais.
+    // Modificamos a transação para incluir o userId em cada operação
     const transaction = leads.map((lead) =>
       prisma.lead.upsert({
-        where: { cnpj: lead.cnpj },
+        where: {
+          // A verificação agora é composta: o CNPJ + o ID do usuário
+          cnpj_userId: {
+            cnpj: lead.cnpj,
+            userId: userId,
+          },
+        },
         update: {
           nomeDevedor: lead.nomeDevedor,
           nomeFantasia: lead.nomeFantasia,
           valorTotalDivida: lead.valorTotalDivida,
         },
         create: {
+          // Ao criar um novo lead, associamos ele ao usuário logado
           cnpj: lead.cnpj,
           nomeDevedor: lead.nomeDevedor,
           nomeFantasia: lead.nomeFantasia,
           valorTotalDivida: lead.valorTotalDivida,
+          userId: userId, // <-- A LINHA ESSENCIAL
         },
       })
     );

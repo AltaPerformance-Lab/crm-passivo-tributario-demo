@@ -2,16 +2,52 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "../../../../../auth";
 
 export const runtime = "nodejs";
+
+// Função utilitária para verificar se o contato pertence ao usuário logado
+async function checkContactOwnership(contactId: number, userId: string) {
+  const contact = await prisma.contato.findUnique({
+    where: {
+      id: contactId,
+    },
+    select: {
+      empresa: {
+        select: {
+          lead: {
+            select: {
+              userId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!contact || contact.empresa?.lead?.userId !== userId) {
+    return false;
+  }
+  return true;
+}
 
 // Função PATCH para ATUALIZAR um contato existente
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const contactId = parseInt(params.id, 10);
+    const session = await auth();
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
+      return NextResponse.json(
+        { message: "Acesso negado. Usuário não autenticado." },
+        { status: 401 }
+      );
+    }
+
+    const contactId = parseInt(context.params.id, 10);
     const body = await request.json();
     const { nome, cargo, telefone, email, observacao } = body;
 
@@ -19,6 +55,13 @@ export async function PATCH(
       return NextResponse.json(
         { message: "O nome é obrigatório." },
         { status: 400 }
+      );
+    }
+
+    if (!(await checkContactOwnership(contactId, userId))) {
+      return NextResponse.json(
+        { message: "Contato não encontrado ou acesso negado." },
+        { status: 404 }
       );
     }
 
@@ -46,10 +89,27 @@ export async function PATCH(
 // Função DELETE para APAGAR um contato (já existente)
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const contactId = parseInt(params.id, 10);
+    const session = await auth();
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
+      return NextResponse.json(
+        { message: "Acesso negado. Usuário não autenticado." },
+        { status: 401 }
+      );
+    }
+
+    const contactId = parseInt(context.params.id, 10);
+
+    if (!(await checkContactOwnership(contactId, userId))) {
+      return NextResponse.json(
+        { message: "Contato não encontrado ou acesso negado." },
+        { status: 404 }
+      );
+    }
 
     await prisma.contato.delete({
       where: { id: contactId },

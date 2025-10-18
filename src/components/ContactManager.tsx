@@ -1,5 +1,3 @@
-// src/components/ContactManager.tsx
-
 "use client";
 
 import type { Contato } from "@prisma/client";
@@ -31,9 +29,9 @@ export default function ContactManager({
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false); // Controla a visibilidade do formulário
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""); // Estado de erro unificado
 
   // States para a funcionalidade de EDIÇÃO
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -44,13 +42,14 @@ export default function ContactManager({
   const router = useRouter();
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhoneOnType(e.target.value);
-    setTelefone(formatted);
+    setTelefone(formatPhoneOnType(e.target.value));
   };
 
   const handleEditPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhoneOnType(e.target.value);
-    setEditFormData({ ...editFormData, telefone: formatted });
+    setEditFormData({
+      ...editFormData,
+      telefone: formatPhoneOnType(e.target.value),
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,15 +71,13 @@ export default function ContactManager({
           empresaId,
         }),
       });
-
       if (!response.ok) throw new Error("Falha ao salvar o contato.");
-
       setNome("");
       setCargo("");
       setTelefone("");
       setEmail("");
       setObservacao("");
-      setIsFormOpen(false); // Fecha o formulário após o sucesso
+      setIsFormOpen(false);
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -90,15 +87,9 @@ export default function ContactManager({
   };
 
   const handleDelete = async (contactId: number) => {
-    if (
-      !window.confirm(
-        "Tem certeza que deseja apagar este contato? Esta ação não pode ser desfeita."
-      )
-    ) {
-      return;
-    }
-
+    if (!window.confirm("Tem certeza que deseja apagar este contato?")) return;
     setDeletingId(contactId);
+    setError("");
     try {
       const response = await fetch(`/api/contacts/${contactId}`, {
         method: "DELETE",
@@ -106,7 +97,8 @@ export default function ContactManager({
       if (!response.ok) throw new Error("Falha ao apagar o contato.");
       router.refresh();
     } catch (err) {
-      alert((err as Error).message);
+      // MELHORIA: Usa o estado de erro em vez do alert
+      setError((err as Error).message);
     } finally {
       setDeletingId(null);
     }
@@ -121,6 +113,7 @@ export default function ContactManager({
       email: contato.email,
       observacao: contato.observacao,
     });
+    setError(""); // Limpa erros antigos ao começar a editar
   };
 
   const handleEditCancel = () => {
@@ -130,8 +123,8 @@ export default function ContactManager({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-
     setIsLoading(true);
+    setError("");
     try {
       const cleanedPhone = (editFormData.telefone || "").replace(/\D/g, "");
       const response = await fetch(`/api/contacts/${editingId}`, {
@@ -140,11 +133,11 @@ export default function ContactManager({
         body: JSON.stringify({ ...editFormData, telefone: cleanedPhone }),
       });
       if (!response.ok) throw new Error("Falha ao atualizar o contato.");
-
       setEditingId(null);
       router.refresh();
     } catch (err) {
-      alert((err as Error).message);
+      // MELHORIA: Usa o estado de erro em vez do alert
+      setError((err as Error).message);
     } finally {
       setIsLoading(false);
     }
@@ -162,12 +155,18 @@ export default function ContactManager({
         </button>
       </div>
 
+      {/* MELHORIA: Exibe a mensagem de erro geral aqui */}
+      {error && (
+        <p className="text-red-400 text-sm mb-4 text-center">{error}</p>
+      )}
+
       {isFormOpen && (
         <form
           onSubmit={handleSubmit}
           className="mb-6 bg-gray-700 p-4 rounded-lg space-y-4 animate-in fade-in-0 duration-300"
         >
           <h3 className="text-lg font-semibold">Adicionar Novo Contato</h3>
+          {/* ... seu formulário de adição ... */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               value={nome}
@@ -210,17 +209,18 @@ export default function ContactManager({
           >
             {isLoading ? "Salvando..." : "Salvar Novo Contato"}
           </button>
-          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
         </form>
       )}
 
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Contatos Salvos</h3>
+        {/* ... sua lista de contatos ... */}
         {contatos.length > 0 ? (
           contatos.map((contato) => (
             <div key={contato.id} className="bg-gray-700 p-4 rounded-lg">
               {editingId === contato.id ? (
                 <form onSubmit={handleUpdate} className="space-y-3">
+                  {/* ... seu formulário de edição ... */}
                   <input
                     required
                     value={editFormData.nome ?? ""}
@@ -293,6 +293,7 @@ export default function ContactManager({
                     deletingId === contato.id ? "opacity-50" : ""
                   }`}
                 >
+                  {/* ... sua visualização de contato ... */}
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-grow space-y-1">
                       <p className="font-bold flex items-center gap-2">

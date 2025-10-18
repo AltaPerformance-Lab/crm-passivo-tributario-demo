@@ -27,10 +27,10 @@ interface PdfData {
 
 const theme = {
   colors: {
-    primary: rgb(0.12, 0.38, 0.57), // Um azul profissional
-    text: rgb(0.2, 0.2, 0.2), // Cinza escuro para texto
-    lightText: rgb(0.5, 0.5, 0.5), // Cinza claro para detalhes
-    line: rgb(0.9, 0.9, 0.9), // Linhas divisórias
+    primary: rgb(0.12, 0.38, 0.57),
+    text: rgb(0.2, 0.2, 0.2),
+    lightText: rgb(0.5, 0.5, 0.5),
+    line: rgb(0.9, 0.9, 0.9),
   },
   fontSizes: {
     h1: 20,
@@ -49,14 +49,6 @@ const formatCNPJ = (cnpj: string | null): string => {
     /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
     "$1.$2.$3/$4-$5"
   );
-};
-
-// Nova função para formatar CPF, se precisar no futuro
-const formatCPF = (cpf: string | null): string => {
-  if (!cpf) return "CPF não informado";
-  const cleaned = cpf.replace(/\D/g, "");
-  if (cleaned.length !== 11) return cpf;
-  return cleaned.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
 };
 
 function wrapText(
@@ -96,13 +88,14 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const margin = 50;
+  // AJUSTE: Diminuímos a margem para 40 para subir o conteúdo
+  const margin = 40;
   let y = height - margin;
 
-  // --- CABEÇALHO COM LOGO MAIOR E CÁLCULO DE ESPAÇO ---
   const headerStartY = y;
-  const maxLogoHeight = 60; // Nova altura máxima para a logo
-  const maxLogoWidth = 150; // Nova largura máxima para a logo
+  // AJUSTE: Aumentamos a altura máxima da logo para 80
+  const maxLogoHeight = 80;
+  const maxLogoWidth = 180;
   let actualLogoHeight = 0;
 
   if (logoImageBuffer) {
@@ -117,18 +110,14 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
       }
       const finalLogoWidth = logoImage.width * scale;
       actualLogoHeight = logoImage.height * scale;
-
       page.drawImage(logoImage, {
         x: margin,
-        y: headerStartY - actualLogoHeight, // Posição exata
+        y: headerStartY - actualLogoHeight,
         width: finalLogoWidth,
         height: actualLogoHeight,
       });
     } catch (e) {
-      console.error(
-        "Não foi possível incorporar a imagem. Usando texto alternativo.",
-        e
-      );
+      console.error("Não foi possível incorporar a imagem.", e);
     }
   }
 
@@ -179,7 +168,7 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   );
 
   y =
-    headerStartY - Math.max(actualLogoHeight, headerStartY - headerTextY) - 20; // Garante que o y está abaixo do maior elemento (logo ou texto)
+    headerStartY - Math.max(actualLogoHeight, headerStartY - headerTextY) - 20;
   page.drawLine({
     start: { x: margin, y: y },
     end: { x: width - margin, y: y },
@@ -198,7 +187,6 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   });
   y -= 30;
 
-  // Bloco de informações do cliente
   const clientInfoY = y;
   page.drawText("Para:", {
     x: margin,
@@ -214,14 +202,14 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     size: theme.fontSizes.body,
     color: theme.colors.text,
   });
-  y -= 15; // Nova linha para o CNPJ do cliente
+  y -= 15;
   page.drawText(formatCNPJ(client.cnpj), {
     x: margin + 35,
     y: y,
     font: font,
     size: theme.fontSizes.body,
     color: theme.colors.text,
-  }); // CNPJ do cliente
+  });
 
   const dates = `Data de Emissão: ${new Date().toLocaleDateString(
     "pt-BR"
@@ -234,9 +222,8 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
     size: theme.fontSizes.small,
     color: theme.colors.lightText,
   });
-  y -= 40; // Ajustado para compensar a linha extra do CNPJ do cliente
+  y -= 40;
 
-  // Função de Seção
   const drawSection = (title: string, content: string) => {
     page.drawText(title, {
       x: margin,
@@ -279,7 +266,7 @@ export async function generateProposalPdf(data: PdfData): Promise<Uint8Array> {
   drawSection("3. Valores e Forma de Pagamento", proposalData.valores);
 
   // --- RODAPÉ ---
-  const footerY = margin + 20; // Posição levemente mais elevada para melhor espaçamento
+  const footerY = margin + 20;
   page.drawLine({
     start: { x: margin, y: footerY },
     end: { x: width - margin, y: footerY },

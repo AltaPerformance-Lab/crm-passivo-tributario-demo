@@ -1,21 +1,17 @@
-// src/app/api/config/upload-logo/route.ts
+// src/app/api/config/upload-logo/route.ts (Versão Segura)
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { put } from "@vercel/blob"; // 1. Importamos o 'put' do Vercel Blob
-import { auth } from "../../../../../auth"; // 2. Importamos a autenticação
+import { put } from "@vercel/blob";
+import { auth } from "../../../../../auth";
 
-// Removemos as importações de 'fs' e 'path'
-// import { writeFile, mkdir } from "fs/promises";
-// import path from "path";
-
-// Adicionamos o runtime do Node.js por usar o Prisma
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  // 3. Adicionamos a verificação de sessão
   const session = await auth();
-  if (!session) {
+  const userId = session?.user?.id;
+
+  if (!userId) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -30,20 +26,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Criamos um nome de ficheiro estático para ser fácil de substituir
-    const filename = `company-logo.${file.name.split(".").pop()}`;
+    // Criamos um nome de arquivo único para o usuário para evitar colisões
+    const filename = `logo-${userId}.${file.name.split(".").pop()}`;
 
-    // 5. Enviamos o ficheiro para o Vercel Blob
     const blob = await put(filename, file, {
       access: "public",
-      // Adicionamos 'addRandomSuffix: false' para garantir que o nome do ficheiro seja sempre o mesmo,
-      // substituindo o logótipo antigo.
+      // addRandomSuffix: false é ótimo para garantir que o logo do usuário seja sempre substituído
       addRandomSuffix: false,
     });
 
-    // 6. Atualizamos o registro de configuração com a URL do Blob
+    // CORREÇÃO: Atualizamos a configuração do usuário logado
     await prisma.configuracao.update({
-      where: { id: 1 },
+      where: {
+        userId: userId, // Usamos o userId da sessão para encontrar o registro correto
+      },
       data: {
         logoUrl: blob.url,
       },

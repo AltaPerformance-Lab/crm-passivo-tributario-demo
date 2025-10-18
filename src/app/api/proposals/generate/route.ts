@@ -1,3 +1,5 @@
+// src/app/api/proposals/generate/route.ts (Versão Segura e Multi-Usuário)
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { put } from "@vercel/blob";
@@ -7,8 +9,11 @@ import { generateProposalPdf } from "@/lib/pdf-generator";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  // 1. Obter e validar a sessão do usuário
   const session = await auth();
-  if (!session) {
+  const userId = session?.user?.id;
+
+  if (!userId) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -22,33 +27,53 @@ export async function POST(request: Request) {
       );
     }
 
-    const config = await prisma.configuracao.findUnique({ where: { id: 1 } });
+    // 2. Buscar a configuração DO USUÁRIO LOGADO
+    const config = await prisma.configuracao.findUnique({
+      where: { userId: userId },
+    });
     if (!config) {
-      throw new Error("Configurações não encontradas.");
-    }
-
-    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-    if (!lead) {
+      // Usamos status 404 para indicar que um recurso essencial não foi encontrado
       return NextResponse.json(
-        { message: "Lead não encontrado." },
+        {
+          message:
+            "Configurações da empresa não encontradas para este usuário.",
+        },
         { status: 404 }
       );
     }
 
+    // 3. Buscar o lead, GARANTINDO QUE ELE PERTENCE AO USUÁRIO LOGADO
+    const lead = await prisma.lead.findFirst({
+      where: {
+        id: leadId,
+        userId: userId, // Filtro de segurança
+      },
+    });
+    if (!lead) {
+      return NextResponse.json(
+        { message: "Lead não encontrado ou acesso negado." },
+        { status: 404 }
+      );
+    }
+
+    // 4. Criar ou atualizar o negócio, ASSOCIANDO AO USUÁRIO
     const negocio = await prisma.negocio.upsert({
       where: { leadId: leadId },
-      update: {},
+      update: {}, // Não precisamos atualizar nada se ele já existe
       create: {
-        leadId: leadId,
         valorFechado: 0,
+        valorEscritorio: 0,
         valorOutraParte: 0,
         valorRecebido: 0,
+        // Conecta o novo negócio ao Lead E ao User
+        lead: { connect: { id: leadId } },
+        user: { connect: { id: userId } },
       },
     });
 
-    // ==========================================================
-    //          BUSCANDO A IMAGEM DA LOGO
-    // ==========================================================
+    // A partir daqui, a lógica de gerar PDF e salvar o arquivo continua a mesma,
+    // pois já está segura por ter pego os dados corretos nos passos anteriores.
+
     let logoImageBuffer: ArrayBuffer | undefined = undefined;
     if (config.logoUrl) {
       try {
@@ -58,10 +83,8 @@ export async function POST(request: Request) {
         }
       } catch (e) {
         console.error("Falha ao buscar a imagem da logo:", e);
-        // Continua sem a logo se a busca falhar
       }
     }
-    // ==========================================================
 
     const plainClient = {
       nomeDevedor: lead.nomeDevedor,
@@ -85,11 +108,10 @@ export async function POST(request: Request) {
       client: plainClient,
       config: plainConfig,
       proposalData: { ...proposalData, validade: validadeFormatada },
-      logoImageBuffer: logoImageBuffer, // Enviando a imagem para o gerador
+      logoImageBuffer: logoImageBuffer,
     });
 
     const pdfBuffer = Buffer.from(pdfBytes);
-
     const filename = `proposta-${negocio.id}-${Date.now()}.pdf`;
     const blobResult = await put(filename, pdfBuffer, {
       access: "public",
@@ -113,7 +135,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("ERRO DETALHADO AO GERAR PDF COM PDF-LIB:", error);
+    console.error("ERRO DETALHADO AO GERAR PDF:", error);
     return NextResponse.json(
       { message: "Falha ao gerar o PDF.", error: (error as Error).message },
       { status: 500 }

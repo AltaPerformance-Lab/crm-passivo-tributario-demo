@@ -77,7 +77,9 @@ export default function ConfiguracoesPage() {
 
   const handleBackup = () => {
     setIsBackingUp(true);
-    window.location.href = "/api/backup";
+    // CORREÇÃO 1: Apontando para a rota correta que criamos
+    window.location.href = "/api/backup/generate";
+    // Usamos um timeout um pouco maior para dar tempo do download começar
     setTimeout(() => setIsBackingUp(false), 5000);
   };
 
@@ -100,7 +102,8 @@ export default function ConfiguracoesPage() {
     try {
       const formData = new FormData();
       formData.append("backupFile", backupFile);
-      const response = await fetch("/api/restore", {
+      // CORREÇÃO 2: Apontando para a rota correta que criamos
+      const response = await fetch("/api/backup/restore", {
         method: "POST",
         body: formData,
       });
@@ -118,9 +121,12 @@ export default function ConfiguracoesPage() {
   };
 
   if (isLoading) {
-    return <p className="text-center p-8">Carregando configurações...</p>;
+    return (
+      <p className="text-center p-8 text-white">Carregando configurações...</p>
+    );
   }
 
+  // O resto do seu JSX continua exatamente o mesmo...
   return (
     <main className="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -129,7 +135,6 @@ export default function ConfiguracoesPage() {
             &larr; Voltar para o painel
           </Link>
         </div>
-
         <div className="bg-gray-800 shadow-md rounded-lg p-6">
           <h1 className="text-3xl font-bold mb-6">Configurações da Empresa</h1>
           <div className="mb-6">
@@ -151,11 +156,12 @@ export default function ConfiguracoesPage() {
                 name="logo"
                 accept="image/png, image/jpeg"
                 onChange={handleFileChange}
-                className="input-style w-full text-sm text-gray-300 file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                className="w-full text-sm text-gray-300 file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
               />
             </div>
           </div>
           <div className="space-y-4">
+            {/* Campos de input (nome, cnpj, etc.) */}
             <div>
               <label className="block mb-1 text-sm text-gray-400">
                 Nome da Empresa
@@ -219,13 +225,16 @@ export default function ConfiguracoesPage() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:bg-gray-500"
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:bg-gray-500 flex items-center justify-center"
             >
-              {isSaving ? "Salvando..." : "Salvar Configurações"}
+              {isSaving ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                "Salvar Configurações"
+              )}
             </button>
           </div>
         </div>
-
         <div className="bg-gray-800 shadow-md rounded-lg p-6">
           <h2 className="text-2xl font-bold mb-4">Backup e Restauração</h2>
           <div className="mb-6">
@@ -265,7 +274,7 @@ export default function ConfiguracoesPage() {
                 onChange={(e) =>
                   setBackupFile(e.target.files ? e.target.files[0] : null)
                 }
-                className="input-style w-full text-sm text-gray-300 file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-white hover:file:bg-gray-500"
+                className="w-full text-sm text-gray-300 file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-white hover:file:bg-gray-500"
                 disabled={isRestoring}
               />
             </div>

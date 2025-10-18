@@ -18,7 +18,8 @@ export default function DealModal({
   onClose,
 }: DealModalProps) {
   const router = useRouter();
-  const [negocio, setNegocio] = useState(initialNegocio);
+  // Unificamos o estado para simplificar
+  const [dealData, setDealData] = useState(initialNegocio);
   const [financials, setFinancials] = useState({
     valorFechado: initialNegocio?.valorFechado || 0,
     valorEscritorio: initialNegocio?.valorEscritorio || 0,
@@ -38,10 +39,12 @@ export default function DealModal({
   const handleSaveDeal = async () => {
     setIsSubmitting(true);
     try {
-      // Garante que um negócio exista antes de fazer upload
-      let currentNegocio = negocio;
+      let currentNegocio = dealData;
+      let refreshNeeded = false; // Controla se precisamos atualizar a tela
 
+      // --- ETAPA 1: Salvar/Atualizar os dados financeiros ---
       if (!currentNegocio) {
+        // Cria um novo negócio
         const res = await fetch("/api/deals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -49,7 +52,9 @@ export default function DealModal({
         });
         if (!res.ok) throw new Error("Falha ao criar o negócio.");
         currentNegocio = await res.json();
+        refreshNeeded = true;
       } else {
+        // Atualiza um negócio existente
         const res = await fetch(`/api/deals/${currentNegocio.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -57,12 +62,13 @@ export default function DealModal({
         });
         if (!res.ok) throw new Error("Falha ao atualizar o negócio.");
         currentNegocio = await res.json();
+        refreshNeeded = true;
       }
 
-      // Atualiza o estado local para refletir o negócio criado/atualizado
-      setNegocio(currentNegocio);
+      // Se a primeira etapa foi bem-sucedida, atualizamos o estado local
+      setDealData(currentNegocio);
 
-      // Se um arquivo foi selecionado, faz o upload
+      // --- ETAPA 2: Fazer o upload do arquivo de proposta, se houver ---
       if (proposalFile && currentNegocio) {
         const formData = new FormData();
         formData.append("proposal", proposalFile);
@@ -74,13 +80,17 @@ export default function DealModal({
         });
         if (!uploadRes.ok)
           throw new Error("Falha ao fazer upload da proposta.");
+        refreshNeeded = true; // O upload também exige um refresh
       }
 
-      router.refresh();
+      // --- ETAPA FINAL: Atualizar a interface e fechar ---
+      if (refreshNeeded) {
+        router.refresh();
+      }
       onClose();
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar o negócio.");
+      alert(`Erro ao salvar: ${(error as Error).message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -88,25 +98,31 @@ export default function DealModal({
 
   const handleDeleteProposal = async (proposalId: number) => {
     if (!window.confirm("Tem certeza que deseja apagar esta proposta?")) return;
-
     setDeletingProposalId(proposalId);
     try {
       const res = await fetch(`/api/proposals/${proposalId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Falha ao apagar a proposta.");
-      router.refresh();
+      router.refresh(); // Corretamente chama o refresh
     } catch (error) {
       console.error(error);
-      alert("Erro ao apagar a proposta.");
+      alert(`Erro: ${(error as Error).message}`);
     } finally {
       setDeletingProposalId(null);
     }
   };
 
+  // O JSX não precisa de grandes mudanças, pois a lógica já era boa.
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-3xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-3xl space-y-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Gerenciar Negócio Convertido</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -116,7 +132,7 @@ export default function DealModal({
 
         <div className="bg-gray-700 p-4 rounded-lg space-y-3">
           <h3 className="font-semibold">Valores do Acordo</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="text-sm text-gray-400 block mb-1">
                 Valor Total Fechado
@@ -183,8 +199,8 @@ export default function DealModal({
         <div className="bg-gray-700 p-4 rounded-lg space-y-3">
           <h3 className="font-semibold">Gerenciar Propostas (PDF)</h3>
           <div className="space-y-2">
-            {negocio?.propostas && negocio.propostas.length > 0 ? (
-              negocio.propostas.map((proposta) => {
+            {dealData?.propostas && dealData.propostas.length > 0 ? (
+              dealData.propostas.map((proposta) => {
                 const isDeleting = deletingProposalId === proposta.id;
                 return (
                   <div
@@ -242,7 +258,7 @@ export default function DealModal({
           disabled={isSubmitting}
           className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:bg-gray-500 flex justify-center items-center gap-2"
         >
-          {isSubmitting ? <Loader2 className="animate-spin" /> : null}
+          {isSubmitting && <Loader2 className="animate-spin" />}
           {isSubmitting ? "Salvando..." : "Salvar Alterações do Negócio"}
         </button>
       </div>

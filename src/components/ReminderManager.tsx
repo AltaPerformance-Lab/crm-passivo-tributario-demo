@@ -1,5 +1,3 @@
-// src/components/ReminderManager.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -19,30 +17,30 @@ export default function ReminderManager({
   const [descricao, setDescricao] = useState("");
   const [data, setData] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null); // Para feedback visual em ações individuais
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null); // Estado para o erro
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!descricao.trim() || !data) {
-      alert("Por favor, preencha a descrição e a data do lembrete.");
+      setError("Por favor, preencha a descrição e a data do lembrete.");
       return;
     }
-
     setIsSubmitting(true);
+    setError(null);
     try {
       await fetch("/api/lembretes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId, descricao, data }),
       });
-
       setDescricao("");
       setData("");
       router.refresh();
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao agendar o lembrete.");
+    } catch (err) {
+      setError("Erro ao agendar o lembrete.");
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
@@ -50,6 +48,7 @@ export default function ReminderManager({
 
   const handleToggleConcluido = async (lembrete: Lembrete) => {
     setBusyId(lembrete.id);
+    setError(null);
     try {
       await fetch(`/api/lembretes/${lembrete.id}`, {
         method: "PATCH",
@@ -57,9 +56,9 @@ export default function ReminderManager({
         body: JSON.stringify({ concluido: !lembrete.concluido }),
       });
       router.refresh();
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao atualizar o lembrete.");
+    } catch (err) {
+      setError("Erro ao atualizar o lembrete.");
+      console.error(err);
     } finally {
       setBusyId(null);
     }
@@ -68,24 +67,20 @@ export default function ReminderManager({
   const handleDelete = async (lembreteId: number) => {
     if (!window.confirm("Tem certeza que deseja apagar este lembrete?")) return;
     setBusyId(lembreteId);
+    setError(null);
     try {
-      await fetch(`/api/lembretes/${lembreteId}`, {
-        method: "DELETE",
-      });
+      await fetch(`/api/lembretes/${lembreteId}`, { method: "DELETE" });
       router.refresh();
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao apagar o lembrete.");
+    } catch (err) {
+      setError("Erro ao apagar o lembrete.");
+      console.error(err);
     } finally {
       setBusyId(null);
     }
   };
 
-  // Ordena os lembretes: os não concluídos primeiro, e depois por data
   const sortedLembretes = [...lembretes].sort((a, b) => {
-    if (a.concluido !== b.concluido) {
-      return a.concluido ? 1 : -1;
-    }
+    if (a.concluido !== b.concluido) return a.concluido ? 1 : -1;
     return new Date(a.data).getTime() - new Date(b.data).getTime();
   });
 
@@ -99,14 +94,14 @@ export default function ReminderManager({
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
           placeholder="Descrição do lembrete..."
-          className="w-full bg-gray-700 p-2 rounded border border-gray-600 focus:ring-2 focus:ring-blue-500"
+          className="input-style w-full bg-gray-700 p-2 rounded border border-gray-600"
           disabled={isSubmitting}
         />
         <input
           type="datetime-local"
           value={data}
           onChange={(e) => setData(e.target.value)}
-          className="w-full bg-gray-700 p-2 rounded border border-gray-600 focus:ring-2 focus:ring-blue-500"
+          className="input-style w-full bg-gray-700 p-2 rounded border border-gray-600"
           disabled={isSubmitting}
         />
         <button
@@ -117,6 +112,9 @@ export default function ReminderManager({
           <BellPlus size={18} />
           {isSubmitting ? "Agendando..." : "Agendar Lembrete"}
         </button>
+        {error && (
+          <p className="text-red-400 text-center text-sm mt-2">{error}</p>
+        )}
       </form>
 
       <div className="space-y-3">

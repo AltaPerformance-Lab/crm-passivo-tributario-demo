@@ -42,7 +42,9 @@ const statusColors: Record<LeadStatus, { bg: string; text: string }> = {
   DESCARTADO: { bg: "bg-red-200", text: "text-red-900" },
 };
 
-// COMPONENTE DE LINHA PARA DESKTOP (Otimizado)
+// Seus sub-componentes (LeadRow, LeadCard, Pagination) continuam perfeitos e não precisam de alteração.
+// ... (O código dos seus componentes LeadRow, LeadCard, Pagination vai aqui, sem mudanças)
+
 const LeadRow = ({
   lead,
   isSelected,
@@ -59,7 +61,6 @@ const LeadRow = ({
     onSelect(lead.id);
   };
   const colors = statusColors[lead.status] || statusColors.A_VERIFICAR;
-
   return (
     <tr
       onClick={handleRowClick}
@@ -110,7 +111,6 @@ const LeadRow = ({
   );
 };
 
-// NOVO: COMPONENTE DE CARTÃO PARA TELEMÓVEL
 const LeadCard = ({
   lead,
   isSelected,
@@ -127,11 +127,10 @@ const LeadCard = ({
     onSelect(lead.id);
   };
   const colors = statusColors[lead.status] || statusColors.A_VERIFICAR;
-
   return (
     <div
       onClick={handleCardClick}
-      className={`bg-gray-800 p-4 rounded-lg mb-3 shadow-md flex items-center gap-4 transition-colors duration-200 cursor-pointer ${
+      className={`bg-gray-800 p-4 rounded-lg shadow-md flex items-center gap-4 transition-colors duration-200 cursor-pointer ${
         isSelected ? "ring-2 ring-blue-500" : "hover:bg-gray-700"
       }`}
     >
@@ -144,7 +143,7 @@ const LeadCard = ({
           className="form-checkbox h-6 w-6 bg-gray-900 border-gray-600 rounded text-blue-600 focus:ring-blue-500"
         />
       </div>
-      <div className="flex-grow">
+      <div className="flex-grow min-w-0">
         <p className="font-bold text-white break-words">{lead.nomeDevedor}</p>
         {lead.nomeFantasia && (
           <p className="text-sm text-gray-400 break-words">
@@ -183,13 +182,11 @@ const Pagination = ({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
   const createPageURL = (pageNumber: number) => {
     const params = new URLSearchParams(searchParams);
     params.set("page", pageNumber.toString());
     return `${pathname}?${params.toString()}`;
   };
-
   return (
     <div className="flex justify-center items-center gap-2 sm:gap-4 text-xs sm:text-sm">
       <button
@@ -229,28 +226,25 @@ export default function LeadsTable() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(
     new Set()
   );
-
   const [isBulkEnriching, setIsBulkEnriching] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState(0);
   const [enrichMessage, setEnrichMessage] = useState("");
+  const [locations, setLocations] = useState<LocationData[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
 
   const currentPage = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
-  const statusFilter = searchParams.get("status") || "A_VERIFICAR";
+  const statusFilter = searchParams.get("status") || "";
   const ufFilter = searchParams.get("uf") || "";
   const cityFilter = searchParams.get("city") || "";
   const sortOrder = searchParams.get("sortOrder") || "desc";
 
-  const [locations, setLocations] = useState<LocationData[]>([]);
-  const [availableCities, setAvailableCities] = useState<string[]>([]);
-
   const handleFilterChange = useCallback(
     (name: string, value: string) => {
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams.toString());
       params.set(name, value);
-      if (name !== "page") {
-        params.set("page", "1");
-      }
+      if (name !== "page") params.set("page", "1");
+      if (name === "uf" && value === "") params.delete("city");
       router.push(`${pathname}?${params.toString()}`);
     },
     [searchParams, router, pathname]
@@ -259,13 +253,8 @@ export default function LeadsTable() {
   useEffect(() => {
     const fetchLeads = async () => {
       setIsLoading(true);
-      const params = new URLSearchParams(searchParams);
-      if (!params.get("page")) params.set("page", "1");
-      if (!params.get("status")) params.set("status", "A_VERIFICAR");
-      if (!params.get("sortOrder")) params.set("sortOrder", "desc");
-
       try {
-        const response = await fetch(`/api/leads?${params.toString()}`);
+        const response = await fetch(`/api/leads?${searchParams.toString()}`);
         if (!response.ok) throw new Error("Falha na resposta da API");
         const { data, total, totalPages } = await response.json();
         setLeads(data);
@@ -281,30 +270,40 @@ export default function LeadsTable() {
     fetchLeads();
   }, [searchParams]);
 
+  // ==========================================================
+  //                CORREÇÃO APLICADA AQUI
+  // ==========================================================
   useEffect(() => {
     const getLocations = async () => {
       try {
         const response = await fetch("/api/locations");
+        // 1. Verificamos se a resposta da API foi bem-sucedida
+        if (!response.ok) {
+          throw new Error(
+            `API de localizações falhou com status: ${response.status}`
+          );
+        }
         const data = await response.json();
-        setLocations(data);
+        // 2. Verificamos se os dados recebidos são de fato um array
+        if (Array.isArray(data)) {
+          setLocations(data);
+        } else {
+          console.error("API de localizações não retornou um array:", data);
+          setLocations([]); // Define como array vazio para evitar o erro
+        }
       } catch (error) {
-        console.error("Erro ao buscar cidades:", error);
+        console.error("Erro na requisição de localizações:", error);
+        setLocations([]); // Garante que locations seja sempre um array em caso de erro
       }
     };
     getLocations();
-  }, []);
+  }, []); // O array de dependências vazio está correto, pois só queremos buscar isso uma vez.
+  // ==========================================================
 
   useEffect(() => {
-    if (ufFilter) {
-      const selectedUfData = locations.find((loc) => loc.uf === ufFilter);
-      setAvailableCities(selectedUfData?.cities || []);
-    } else {
-      setAvailableCities([]);
-    }
-    if (!searchParams.has("city")) {
-      handleFilterChange("city", "");
-    }
-  }, [ufFilter, locations, searchParams, handleFilterChange]);
+    const selectedUf = locations.find((loc) => loc.uf === ufFilter);
+    setAvailableCities(selectedUf?.cities || []);
+  }, [ufFilter, locations]);
 
   const handleSelectLead = (leadId: number) => {
     setSelectedLeadIds((prev) => {
@@ -342,7 +341,6 @@ export default function LeadsTable() {
   const handleBulkEnrich = async () => {
     const leadsToEnrich = leads.filter((lead) => !lead.empresaId);
     if (leadsToEnrich.length === 0) {
-      // Usar uma notificação mais amigável em vez de alert
       alert("Todos os leads nesta página já foram enriquecidos.");
       return;
     }
@@ -428,26 +426,25 @@ export default function LeadsTable() {
           <LogoutButton />
         </div>
       </div>
-
       {isBulkEnriching && (
         <div className="mb-4">
+          {" "}
           <div className="w-full bg-gray-700 rounded-full h-2.5">
+            {" "}
             <div
               className="bg-teal-600 h-2.5 rounded-full"
               style={{
                 width: `${enrichProgress}%`,
                 transition: "width 0.5s ease-in-out",
               }}
-            ></div>
-          </div>
+            ></div>{" "}
+          </div>{" "}
           <p className="text-center text-sm text-teal-300 mt-1">
             {enrichMessage}
-          </p>
+          </p>{" "}
         </div>
       )}
-
       <UpcomingReminders />
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         <input
           type="text"
@@ -483,7 +480,7 @@ export default function LeadsTable() {
         <select
           value={cityFilter}
           onChange={(e) => handleFilterChange("city", e.target.value)}
-          disabled={!ufFilter && availableCities.length === 0}
+          disabled={!ufFilter}
           className="px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value="">Todas as Cidades</option>
@@ -493,7 +490,6 @@ export default function LeadsTable() {
             </option>
           ))}
         </select>
-
         <div className="flex items-center gap-2 bg-gray-700 px-4 py-2 border border-gray-600 rounded-lg md:col-span-2 lg:col-span-5">
           <label className="text-sm text-gray-400">Ordenar por:</label>
           <button
@@ -518,16 +514,12 @@ export default function LeadsTable() {
           </button>
         </div>
       </div>
-
-      {/* --- MUDANÇA ESTRUTURAL PARA RESPONSIVIDADE --- */}
-      {/* Lista de cartões para telemóvel */}
       <div className="md:hidden space-y-3">
-        {isLoading && (
+        {isLoading ? (
           <div className="p-8 text-center text-gray-400">
             <Loader2 className="mx-auto animate-spin" />
           </div>
-        )}
-        {!isLoading &&
+        ) : (
           leads.map((lead) => (
             <LeadCard
               key={lead.id}
@@ -535,10 +527,9 @@ export default function LeadsTable() {
               isSelected={selectedLeadIds.has(lead.id)}
               onSelect={handleSelectLead}
             />
-          ))}
+          ))
+        )}
       </div>
-
-      {/* Tabela para desktop */}
       <div className="hidden md:block bg-gray-800 shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-full leading-normal">
           <thead>
@@ -585,12 +576,10 @@ export default function LeadsTable() {
           </div>
         )}
       </div>
-
-      {/* Paginação Comum */}
-      <div className="p-4">
+      <div className="py-5">
         {!isLoading && totalLeads > 0 && (
           <Pagination currentPage={currentPage} totalPages={totalPages} />
-        )}
+        )}{" "}
         {!isLoading && totalLeads === 0 && (
           <p className="text-center text-gray-400">
             Nenhum resultado encontrado.

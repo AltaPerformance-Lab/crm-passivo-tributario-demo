@@ -1,12 +1,10 @@
-// Local: GARANTA que este arquivo esteja em 'src/middleware.ts'
-
 import { auth } from "../auth";
 import { NextResponse } from "next/server";
 
 export default auth((req) => {
-  // Agora temos uma lógica explícita.
   // Se a propriedade `req.auth` (que contém a sessão) não existir,
   // significa que o usuário não está logado.
+  // IMPORTANTE: Esta lógica só é executada nas rotas que o `matcher` não exclui.
   if (!req.auth) {
     // Criamos a URL completa para a página de login.
     const loginUrl = new URL("/login", req.url);
@@ -21,7 +19,9 @@ export default auth((req) => {
   return NextResponse.next();
 });
 
-// Voltamos ao matcher que protege todas as páginas, exceto as de sistema e a de login.
+// CORREÇÃO: Voltamos ao matcher que protege todas as páginas, exceto as de sistema,
+// a de login E a de registro.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login).*)"],
+  // A regex agora exclui explicitamente 'login' E 'register'
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).*)"],
 };

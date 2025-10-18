@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +5,24 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String?
+  email        String?        @unique
+  password     String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  role         Role           @default(USER)
+  leads        Lead[]
+  negocios     Negocio[]
+  configuracao Configuracao?
 }
 
 enum LeadStatus {
@@ -49,30 +65,24 @@ model Empresa {
 }
 
 model Socio {
-  id                     Int     @id @default(autoincrement())
+  id                     Int      @id @default(autoincrement())
   nomeSocio              String
-  qualificacaoSocio      String
-  dataEntradaSociedade   String?
-  documento              String?
-  empresa                Empresa @relation(fields: [empresaId], references: [id])
+  // ... outros campos ...
+  empresa                Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empresaId              Int
 }
 
 model Contato {
   id         Int      @id @default(autoincrement())
   nome       String
-  cargo      String?
-  telefone   String?
-  email      String?
-  observacao String?
-  createdAt  DateTime @default(now())
-  empresa    Empresa  @relation(fields: [empresaId], references: [id])
+  // ... outros campos ...
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empresaId  Int
 }
 
 model Lead {
-  id               Int        @id @default(autoincrement())
-  cnpj             String     @unique
+  id               String     @id @default(cuid()) // PADRONIZADO para String
+  cnpj             String
   nomeDevedor      String
   nomeFantasia     String?
   valorTotalDivida Float
@@ -84,72 +94,74 @@ model Lead {
   empresaId        Int?       @unique
   empresa          Empresa?   @relation(fields: [empresaId], references: [id])
   negocio          Negocio?
-
   atividades       Atividade[]
-
-  lembretes   Lembrete[]
-
+  lembretes        Lembrete[]
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([cnpj, userId])
+  @@index([userId])      // ADICIONADO: Para performance
   @@index([nomeDevedor])
   @@index([municipio])
 }
 
 model Negocio {
-  id                Int        @id @default(autoincrement())
+  id                String     @id @default(cuid()) // PADRONIZADO para String
   valorFechado      Float
   valorEscritorio   Float      @default(0)
   valorOutraParte   Float
   valorRecebido     Float
   dataFechamento    DateTime   @default(now())
-  propostaUrl       String?
   lead              Lead       @relation(fields: [leadId], references: [id])
-  leadId            Int        @unique
+  leadId            String     @unique // PADRONIZADO para String
   propostas         Proposta[]
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])      // ADICIONADO: Para performance
 }
 
 model Proposta {
-  id        Int      @id @default(autoincrement())
-
-  // --- Campos para a proposta GERADA (agora opcionais) ---
-  objeto    String?
-  escopo    String?  @db.Text
-  valores   String?  @db.Text
-  validade  DateTime?
-
-  // --- Campos para o ARQUIVO (seja gerado ou de upload) ---
-  nomeArquivo    String?  // O nome original do arquivo
-  caminhoArquivo String   // O caminho/URL para o arquivo salvo
-  
-  createdAt DateTime @default(now())
-  negocio   Negocio  @relation(fields: [negocioId], references: [id])
-  negocioId Int
+  id             String    @id @default(cuid()) // PADRONIZADO para String
+  objeto         String?
+  escopo         String?   @db.Text
+  valores        String?   @db.Text
+  validade       DateTime?
+  nomeArquivo    String?
+  caminhoArquivo String
+  createdAt      DateTime  @default(now())
+  negocio        Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId      String    // PADRONIZADO para String
 }
 
 model Configuracao {
-  id          Int     @id @default(1)
+  id          String  @id @default(cuid()) // PADRONIZADO para String
   nomeEmpresa String?
   cnpj        String?
   endereco    String?
   email       String?
   telefone    String?
   logoUrl     String?
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId]) // ADICIONADO: Para performance
 }
 
 model Atividade {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid()) // PADRONIZADO para String
   conteudo  String   @db.Text
   criadoEm  DateTime @default(now())
-
-  lead      Lead     @relation(fields: [leadId], references: [id])
-  leadId    Int
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String   // PADRONIZADO para String
 }
 
 model Lembrete {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid()) // PADRONIZADO para String
   data      DateTime
   descricao String
   concluido Boolean  @default(false)
   criadoEm  DateTime @default(now())
-
-  lead      Lead     @relation(fields: [leadId], references: [id])
-  leadId    Int
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String   // PADRONIZADO para String
 }

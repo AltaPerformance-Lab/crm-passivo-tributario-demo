@@ -1,55 +1,65 @@
+// src/app/api/proposals/[id]/route.ts (Versão Segura)
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "../../../../../auth";
-import { del } from "@vercel/blob"; // 1. Importamos a função 'del' do Vercel Blob
-
-// Removemos as importações de 'fs/promises' e 'path'
-// import { unlink } from "fs/promises";
-// import path from "path";
+import { del } from "@vercel/blob";
 
 export const runtime = "nodejs";
 
-// Função DELETE para apagar uma proposta específica
+// Função DELETE para apagar uma proposta específica de forma segura
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  // 2. Verificamos se o utilizador está autenticado
   const session = await auth();
-  if (!session) {
+  // Obtemos o ID do usuário da sessão
+  const userId = session?.user?.id;
+
+  if (!userId) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   try {
     const proposalId = parseInt(params.id, 10);
+    if (isNaN(proposalId)) {
+      return NextResponse.json(
+        { message: "ID da proposta inválido." },
+        { status: 400 }
+      );
+    }
 
-    // 3. Primeiro, encontramos a proposta no banco de dados para obter a URL do ficheiro
-    const proposal = await prisma.proposta.findUnique({
-      where: { id: proposalId },
+    // VERIFICAÇÃO DE POSSE: Buscamos a proposta garantindo que ela
+    // pertence a um negócio do usuário logado.
+    const proposal = await prisma.proposta.findFirst({
+      where: {
+        id: proposalId,
+        negocio: {
+          userId: userId, // <-- A verificação de segurança acontece aqui
+        },
+      },
     });
 
     if (!proposal) {
       return NextResponse.json(
-        { message: "Proposta não encontrada." },
+        { message: "Proposta não encontrada ou acesso negado." },
         { status: 404 }
       );
     }
 
-    // 4. Se a proposta tiver um ficheiro associado, apagamo-lo do Vercel Blob
-    // A função 'del' aceita a URL completa do blob.
+    // Se a proposta tiver um arquivo associado, apagamo-lo do Vercel Blob
     if (proposal.caminhoArquivo) {
       try {
         await del(proposal.caminhoArquivo);
       } catch (fileError) {
-        // Se o ficheiro não existir no Blob, apenas registamos o aviso mas continuamos
         console.warn(
-          `Ficheiro não encontrado no Blob para apagar: ${proposal.caminhoArquivo}`,
+          `Arquivo não encontrado no Blob para apagar (mas a operação continuará): ${proposal.caminhoArquivo}`,
           fileError
         );
       }
     }
 
-    // 5. Depois de apagar o ficheiro (ou se não houver ficheiro), apagamos o registo do banco de dados
+    // Agora, com a certeza de que a proposta pertence ao usuário, apagamos o registro
     await prisma.proposta.delete({
       where: { id: proposalId },
     });

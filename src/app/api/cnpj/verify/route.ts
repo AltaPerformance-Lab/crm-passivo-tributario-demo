@@ -1,13 +1,22 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+// Caminho inferido: src/app/api/cnpj/verify/route.ts (Versão Segura)
 
-// ADICIONADO: Força a rota a usar o runtime do Node.js para compatibilidade com o Prisma
+import { NextResponse, NextRequest } from "next/server";
+import prisma from "@/lib/prisma";
+import { auth } from "../../../../../auth"; // 1. Importar a autenticação
+
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { cnpj } = body;
+    // 2. Obter a sessão e garantir que o usuário está logado
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    const { cnpj } = await req.json();
 
     if (!cnpj || typeof cnpj !== "string") {
       return NextResponse.json(
@@ -18,22 +27,29 @@ export async function POST(request: Request) {
 
     const cleanedCnpj = cnpj.replace(/[^\d]/g, "");
 
-    const lead = await prisma.lead.findUnique({ where: { cnpj: cleanedCnpj } });
+    // 3. BUSCA SEGURA: Procuramos o lead que tenha o CNPJ E pertença ao usuário logado
+    const lead = await prisma.lead.findFirst({
+      where: {
+        cnpj: cleanedCnpj,
+        userId: userId, // <-- Filtro de segurança
+      },
+    });
+
     if (!lead) {
       return NextResponse.json(
-        { message: `Nenhum lead encontrado para o CNPJ ${cleanedCnpj}.` },
+        {
+          message: `Nenhum lead encontrado para o CNPJ ${cleanedCnpj} em sua carteira.`,
+        },
         { status: 404 }
       );
     }
 
+    // A partir daqui, todo o resto da sua lógica já está correta e segura,
+    // pois estamos operando sobre um 'lead' que já foi verificado.
+
     const response = await fetch(
       `https://brasilapi.com.br/api/cnpj/v1/${cleanedCnpj}`,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-        },
-      }
+      { headers: { "User-Agent": "Mozilla/5.0" } }
     );
 
     if (!response.ok) {
@@ -58,7 +74,6 @@ export async function POST(request: Request) {
         where: { id: lead.id },
         data: { status: "DESCARTADO" },
       });
-
       return NextResponse.json(
         {
           message: `Empresa com CNPJ ${cleanedCnpj} não está ATIVA. Status do lead alterado para DESCARTADO.`,

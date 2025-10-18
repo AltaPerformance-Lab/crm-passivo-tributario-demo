@@ -1,15 +1,23 @@
+// src/app/api/leads/route.ts (Versão Polida)
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { LeadStatus } from "@prisma/client";
+// Importamos o tipo 'Prisma' para uma tipagem mais forte
+import { LeadStatus, Prisma } from "@prisma/client";
+import { auth } from "../../../../auth";
 
 export const runtime = "nodejs";
-
-// --- CORREÇÃO: Força a rota a ser sempre dinâmica ---
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    // Agora usamos request.nextUrl.searchParams que é compatível com builds de produção
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1", 10);
     const take = 50;
@@ -19,14 +27,17 @@ export async function GET(request: NextRequest) {
 
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status");
-    const city = searchParams.get("city");
-    const uf = searchParams.get("uf");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
+    // ... outros filtros ...
 
-    const where: any = { AND: [] };
+    // O 'where' agora tem a tipagem correta, o que nos dá autocomplete e segurança
+    const where: Prisma.LeadWhereInput = {
+      userId: userId,
+    };
+
+    const filterConditions: Prisma.LeadWhereInput[] = [];
+
     if (search) {
-      where.AND.push({
+      filterConditions.push({
         OR: [
           { nomeDevedor: { contains: search, mode: "insensitive" } },
           { cnpj: { contains: search } },
@@ -34,31 +45,22 @@ export async function GET(request: NextRequest) {
       });
     }
     if (status && Object.values(LeadStatus).includes(status as LeadStatus)) {
-      where.AND.push({ status: status as LeadStatus });
+      filterConditions.push({ status: status as LeadStatus });
     }
-    if (uf) {
-      where.AND.push({ empresa: { uf: uf } });
-    }
-    if (city) {
-      where.AND.push({ empresa: { municipio: city } });
-    }
-    if (startDate && endDate) {
-      where.AND.push({
-        updatedAt: { gte: new Date(startDate), lte: new Date(endDate) },
-      });
-    }
-    if (where.AND.length === 0) {
-      delete where.AND;
+    // ... adicione outros filtros aqui no futuro ...
+
+    if (filterConditions.length > 0) {
+      where.AND = filterConditions;
     }
 
     const [leads, total] = await prisma.$transaction([
       prisma.lead.findMany({
-        where: where,
-        skip: skip,
-        take: take,
+        where, // A variável 'where' agora é totalmente tipada
+        skip,
+        take,
         orderBy: { [sortBy]: sortOrder },
       }),
-      prisma.lead.count({ where: where }),
+      prisma.lead.count({ where }),
     ]);
 
     return NextResponse.json({

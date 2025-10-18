@@ -1,11 +1,21 @@
+// Caminho inferido: src/app/api/atividades/route.ts (Versão Segura)
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "../../../../auth"; // 1. Importar a autenticação
 
-// ADICIONADO: Força a rota a usar o runtime do Node.js
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    // 2. Obter a sessão do usuário logado
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
+    }
+
     const { leadId, conteudo } = await request.json();
 
     if (!leadId || !conteudo) {
@@ -15,9 +25,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const numericLeadId = parseInt(leadId, 10);
+    if (isNaN(numericLeadId)) {
+      return NextResponse.json(
+        { message: "ID do Lead inválido." },
+        { status: 400 }
+      );
+    }
+
+    // 3. VERIFICAÇÃO DE POSSE (O PASSO DE SEGURANÇA)
+    // Verificamos se o lead onde queremos criar a atividade
+    // realmente pertence ao usuário que está fazendo a requisição.
+    const leadPertenceAoUsuario = await prisma.lead.findFirst({
+      where: {
+        id: numericLeadId,
+        userId: userId,
+      },
+    });
+
+    if (!leadPertenceAoUsuario) {
+      return NextResponse.json(
+        { message: "Lead não encontrado ou acesso negado." },
+        { status: 404 }
+      );
+    }
+
+    // 4. Se a verificação passar, podemos criar a atividade com segurança
     const novaAtividade = await prisma.atividade.create({
       data: {
-        leadId: parseInt(leadId, 10),
+        leadId: numericLeadId,
         conteudo: conteudo,
       },
     });

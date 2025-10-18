@@ -1,12 +1,31 @@
+// Caminho inferido: /src/app/api/backup/restore/route.ts (Versão Segura)
+
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
 import os from "os";
+import { auth } from "../../../../auth"; // Importamos a autenticação
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  // ==========================================================
+  //          FIREWALL DE SEGURANÇA (ETAPA CRÍTICA)
+  // ==========================================================
+  const session = await auth();
+  // Verificamos não apenas se o usuário está logado, mas se ele é um ADMIN
+  if (session?.user?.role !== "ADMIN") {
+    return NextResponse.json(
+      {
+        message:
+          "Acesso negado. Apenas administradores podem executar esta ação.",
+      },
+      { status: 403 } // 403 Forbidden é o status correto para acesso negado
+    );
+  }
+  // ==========================================================
+
   let tempFilePath = "";
   try {
     const formData = await req.formData();
@@ -50,9 +69,6 @@ export async function POST(req: NextRequest) {
       );
     });
 
-    // --- CORREÇÃO APLICADA AQUI ---
-    // Adicionamos `-d postgres` aos comandos de DROP e CREATE para que o psql
-    // se conecte ao banco de dados padrão 'postgres' antes de tentar gerir o 'prospectdb'.
     const commandsToRun = [
       `psql -U ${dbUser} -d postgres -c 'DROP DATABASE IF EXISTS ${dbName} WITH (FORCE);'`,
       `psql -U ${dbUser} -d postgres -c 'CREATE DATABASE ${dbName};'`,

@@ -1,21 +1,12 @@
 import type { NextAuthConfig } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
 
 export const authConfig = {
-  providers: [
-    Credentials({
-      async authorize(credentials) {
-        if (
-          credentials.username === "admin" &&
-          credentials.password === "admin"
-        ) {
-          return { id: "1", name: "Admin" };
-        }
-        return null;
-      },
-    }),
-  ],
+  // A propriedade 'providers' é obrigatória pelo tipo NextAuthConfig.
+  // Deixamos vazia, pois a lógica de Credentials será usada diretamente no auth.ts.
+  providers: [],
+
   pages: {
     signIn: "/login",
   },
+  // Você pode adicionar callbacks ou outras configurações aqui se quiser.
 } satisfies NextAuthConfig;
