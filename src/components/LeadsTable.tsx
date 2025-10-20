@@ -42,9 +42,7 @@ const statusColors: Record<LeadStatus, { bg: string; text: string }> = {
   DESCARTADO: { bg: "bg-red-200", text: "text-red-900" },
 };
 
-// Seus sub-componentes (LeadRow, LeadCard, Pagination) continuam perfeitos e não precisam de alteração.
-// ... (O código dos seus componentes LeadRow, LeadCard, Pagination vai aqui, sem mudanças)
-
+// CORREÇÃO: onSelect agora espera 'string'
 const LeadRow = ({
   lead,
   isSelected,
@@ -52,7 +50,7 @@ const LeadRow = ({
 }: {
   lead: Lead;
   isSelected: boolean;
-  onSelect: (leadId: number) => void;
+  onSelect: (leadId: string) => void;
 }) => {
   const router = useRouter();
   const handleRowClick = () => router.push(`/leads/${lead.id}`);
@@ -111,6 +109,7 @@ const LeadRow = ({
   );
 };
 
+// CORREÇÃO: onSelect agora espera 'string'
 const LeadCard = ({
   lead,
   isSelected,
@@ -118,7 +117,7 @@ const LeadCard = ({
 }: {
   lead: Lead;
   isSelected: boolean;
-  onSelect: (leadId: number) => void;
+  onSelect: (leadId: string) => void;
 }) => {
   const router = useRouter();
   const handleCardClick = () => router.push(`/leads/${lead.id}`);
@@ -223,7 +222,8 @@ export default function LeadsTable() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<number>>(
+  // CORREÇÃO: O Set agora armazena 'string'
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(
     new Set()
   );
   const [isBulkEnriching, setIsBulkEnriching] = useState(false);
@@ -270,55 +270,49 @@ export default function LeadsTable() {
     fetchLeads();
   }, [searchParams]);
 
-  // ==========================================================
-  //                CORREÇÃO APLICADA AQUI
-  // ==========================================================
   useEffect(() => {
     const getLocations = async () => {
       try {
         const response = await fetch("/api/locations");
-        // 1. Verificamos se a resposta da API foi bem-sucedida
-        if (!response.ok) {
+        if (!response.ok)
           throw new Error(
             `API de localizações falhou com status: ${response.status}`
           );
-        }
         const data = await response.json();
-        // 2. Verificamos se os dados recebidos são de fato um array
         if (Array.isArray(data)) {
           setLocations(data);
         } else {
           console.error("API de localizações não retornou um array:", data);
-          setLocations([]); // Define como array vazio para evitar o erro
+          setLocations([]);
         }
       } catch (error) {
         console.error("Erro na requisição de localizações:", error);
-        setLocations([]); // Garante que locations seja sempre um array em caso de erro
+        setLocations([]);
       }
     };
     getLocations();
-  }, []); // O array de dependências vazio está correto, pois só queremos buscar isso uma vez.
-  // ==========================================================
+  }, []);
 
   useEffect(() => {
     const selectedUf = locations.find((loc) => loc.uf === ufFilter);
     setAvailableCities(selectedUf?.cities || []);
   }, [ufFilter, locations]);
 
-  const handleSelectLead = (leadId: number) => {
+  // CORREÇÃO: A função agora lida com 'string'
+  const handleSelectLead = (leadId: string) => {
     setSelectedLeadIds((prev) => {
-      const newSelected = new Set(prev);
-      if (newSelected.has(leadId)) newSelected.delete(leadId);
-      else newSelected.add(leadId);
-      return newSelected;
+      const newSet = new Set(prev);
+      if (newSet.has(leadId)) newSet.delete(leadId);
+      else newSet.add(leadId);
+      return newSet;
     });
   };
 
   const handleSelectAll = () => {
-    if (selectedLeadIds.size === leads.length) {
+    if (leads.length > 0 && selectedLeadIds.size === leads.length) {
       setSelectedLeadIds(new Set());
     } else {
-      setSelectedLeadIds(new Set(leads.map((lead) => lead.id)));
+      setSelectedLeadIds(new Set(leads.map((l) => l.id)));
     }
   };
 
@@ -426,25 +420,26 @@ export default function LeadsTable() {
           <LogoutButton />
         </div>
       </div>
+
       {isBulkEnriching && (
         <div className="mb-4">
-          {" "}
           <div className="w-full bg-gray-700 rounded-full h-2.5">
-            {" "}
             <div
               className="bg-teal-600 h-2.5 rounded-full"
               style={{
                 width: `${enrichProgress}%`,
                 transition: "width 0.5s ease-in-out",
               }}
-            ></div>{" "}
-          </div>{" "}
+            ></div>
+          </div>
           <p className="text-center text-sm text-teal-300 mt-1">
             {enrichMessage}
-          </p>{" "}
+          </p>
         </div>
       )}
+
       <UpcomingReminders />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         <input
           type="text"
@@ -514,6 +509,7 @@ export default function LeadsTable() {
           </button>
         </div>
       </div>
+
       <div className="md:hidden space-y-3">
         {isLoading ? (
           <div className="p-8 text-center text-gray-400">
@@ -530,6 +526,7 @@ export default function LeadsTable() {
           ))
         )}
       </div>
+
       <div className="hidden md:block bg-gray-800 shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-full leading-normal">
           <thead>
@@ -576,10 +573,11 @@ export default function LeadsTable() {
           </div>
         )}
       </div>
+
       <div className="py-5">
         {!isLoading && totalLeads > 0 && (
           <Pagination currentPage={currentPage} totalPages={totalPages} />
-        )}{" "}
+        )}
         {!isLoading && totalLeads === 0 && (
           <p className="text-center text-gray-400">
             Nenhum resultado encontrado.

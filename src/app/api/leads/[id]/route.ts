@@ -1,34 +1,31 @@
-// src/app/api/leads/[id]/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client";
-import { auth } from "../../../../../auth"; // Importa a função de autenticação
+import { auth } from "../../../../../auth";
+import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
-// CORRIGIDO: Assinatura da função mudada para usar 'context' para tipagem correta do Next.js
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } } // Tipagem correta para rotas dinâmicas
+  { params }: { params: { id: string } }
 ) {
   try {
-    // 1. Validação de Autenticação
     const session = await auth();
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
 
     if (!userId) {
       return NextResponse.json(
         { message: "Acesso negado. Usuário não autenticado." },
-        { status: 401 } // 401 Unauthorized
+        { status: 401 }
       );
     }
 
-    // Acessa o ID via context.params
-    const leadId = parseInt(context.params.id, 10);
+    // 1. O ID agora é uma string, removemos o parseInt
+    const leadId = params.id;
     const body = await request.json();
     const { status } = body;
 
-    // Validação 1: O status foi enviado?
     if (!status) {
       return NextResponse.json(
         { message: "Novo status é obrigatório." },
@@ -36,40 +33,42 @@ export async function PATCH(
       );
     }
 
-    // Validação 2: O status é um dos valores válidos do nosso Enum?
-    const validStatuses = Object.keys(LeadStatus);
+    const validStatuses = Object.values(LeadStatus); // Usamos Object.values para o enum
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
-        {
-          message: `Status '${status}' é inválido. Valores válidos: ${validStatuses.join(
-            ", "
-          )}`,
-        },
+        { message: `Status '${status}' é inválido.` },
         { status: 400 }
       );
     }
 
-    // 2. Atualiza o lead no banco de dados, GARANTINDO PROPRIEDADE
-    const updatedLead = await prisma.lead.update({
+    // 2. VERIFICAÇÃO DE POSSE: Primeiro, garantimos que o lead pertence ao usuário
+    const leadToUpdate = await prisma.lead.findFirst({
       where: {
         id: leadId,
-        userId: userId, // CRÍTICO: Garante que o lead pertence ao usuário logado
+        userId: userId,
       },
-      data: { status: status as LeadStatus }, // TypeScript agora aceita o status validado
     });
 
-    return NextResponse.json(updatedLead, { status: 200 });
-  } catch (error) {
-    console.error("Erro ao atualizar o status do lead:", error);
-
-    // Tratamento específico para erros do Prisma (ex: lead não encontrado ou não pertence)
-    if (error instanceof Error && "code" in error && error.code === "P2025") {
+    if (!leadToUpdate) {
       return NextResponse.json(
         { message: "Lead não encontrado ou acesso negado." },
         { status: 404 }
       );
     }
 
+    // 3. Se a verificação passar, fazemos a atualização com segurança
+    const updatedLead = await prisma.lead.update({
+      where: {
+        id: leadId, // Agora podemos usar o ID único com segurança
+      },
+      data: { status: status as LeadStatus },
+    });
+
+    return NextResponse.json(updatedLead, { status: 200 });
+  } catch (error) {
+    console.error("Erro ao atualizar o status do lead:", error);
+
+    // O catch genérico já é suficiente agora
     return NextResponse.json(
       { message: "Erro interno no servidor ao atualizar o status do lead." },
       { status: 500 }

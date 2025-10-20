@@ -1,4 +1,4 @@
-// Caminho inferido: src/app/api/proposals/upload/route.ts (Versão Segura)
+// src/app/api/proposals/upload/route.ts (Versão Segura com ID String)
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
@@ -18,30 +18,24 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("proposal") as File | null;
-    const negocioIdString = formData.get("negocioId") as string | null;
+    const negocioId = formData.get("negocioId") as string | null; // Já recebemos como string
 
-    if (!file || !negocioIdString) {
+    if (!file || !negocioId) {
       return NextResponse.json(
         { message: "Arquivo da proposta e ID do negócio são obrigatórios." },
         { status: 400 }
       );
     }
 
-    const negocioId = parseInt(negocioIdString, 10);
-    if (isNaN(negocioId)) {
-      return NextResponse.json(
-        { message: "ID do negócio inválido." },
-        { status: 400 }
-      );
-    }
+    // O ID já é uma string, não precisamos de parseInt nem isNaN.
 
     // ==========================================================
     //          VERIFICAÇÃO DE POSSE DO NEGÓCIO (SEGURANÇA)
     // ==========================================================
     const negocioPertenceAoUsuario = await prisma.negocio.findFirst({
       where: {
-        id: negocioId,
-        userId: userId, // Verifica se o negócio pertence ao usuário logado
+        id: negocioId, // Usamos a string diretamente
+        userId: userId,
       },
     });
 
@@ -53,7 +47,6 @@ export async function POST(request: Request) {
     }
     // ==========================================================
 
-    // Se a verificação passar, continuamos com o upload e criação
     const filename = `${Date.now()}-${file.name.replace(/\s/g, "_")}`;
 
     const blob = await put(filename, file, {
@@ -62,7 +55,7 @@ export async function POST(request: Request) {
 
     const novaProposta = await prisma.proposta.create({
       data: {
-        negocioId: negocioId,
+        negocioId: negocioId, // Usamos a string diretamente
         caminhoArquivo: blob.url,
         nomeArquivo: file.name,
       },

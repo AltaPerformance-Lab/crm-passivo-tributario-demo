@@ -8,7 +8,7 @@ import type { Atividade } from "@prisma/client";
 import { MessageSquarePlus, Clock } from "lucide-react";
 
 interface ActivityManagerProps {
-  leadId: number;
+  leadId: string;
   atividades: Atividade[];
 }
 

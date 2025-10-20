@@ -1,8 +1,8 @@
-// src/app/api/deals/[id]/route.ts (Versão Segura)
+// src/app/api/deals/[id]/route.ts (Versão Segura com ID String)
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { auth } from "../../../../../auth"; // 1. Importar a autenticação
+import { auth } from "../../../../../auth";
 import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -12,7 +12,6 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    // 2. Obter a sessão e o ID do usuário logado
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -20,22 +19,31 @@ export async function PATCH(
       return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
     }
 
-    const dealId = parseInt(params.id, 10);
-    if (isNaN(dealId)) {
-      return NextResponse.json({ message: "ID inválido." }, { status: 400 });
-    }
+    // 1. O ID agora é uma string, removemos o parseInt
+    const dealId = params.id;
 
     const { valorFechado, valorEscritorio, valorOutraParte, valorRecebido } =
       await request.json();
 
-    // 3. FAZER O UPDATE COM A VERIFICAÇÃO DE POSSE EMBUTIDA
-    // O 'where' agora exige que o ID do negócio E o ID do usuário correspondam.
-    // Se um usuário tentar atualizar o negócio de outro, o Prisma não encontrará
-    // o registro e lançará um erro, que será capturado pelo catch.
-    const updatedDeal = await prisma.negocio.update({
+    // 2. VERIFICAÇÃO DE POSSE: Primeiro, garantimos que o negócio pertence ao usuário
+    const dealToUpdate = await prisma.negocio.findFirst({
       where: {
         id: dealId,
-        userId: userId, // <-- A VERIFICAÇÃO DE SEGURANÇA ACONTECE AQUI!
+        userId: userId,
+      },
+    });
+
+    if (!dealToUpdate) {
+      return NextResponse.json(
+        { message: "Negócio não encontrado ou acesso negado." },
+        { status: 404 }
+      );
+    }
+
+    // 3. Se a verificação passar, fazemos a atualização com segurança
+    const updatedDeal = await prisma.negocio.update({
+      where: {
+        id: dealId, // Agora podemos usar o ID único com segurança
       },
       data: {
         valorFechado,
@@ -48,18 +56,7 @@ export async function PATCH(
     return NextResponse.json(updatedDeal);
   } catch (error) {
     console.error("Erro ao atualizar negócio:", error);
-
-    // Tratamento de erro específico do Prisma para "registro não encontrado"
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2025"
-    ) {
-      return NextResponse.json(
-        { message: "Negócio não encontrado ou acesso negado." },
-        { status: 404 }
-      );
-    }
-
+    // Um catch genérico é suficiente aqui, pois já tratamos o caso "não encontrado".
     return NextResponse.json(
       { message: "Erro interno no servidor ao atualizar negócio." },
       { status: 500 }

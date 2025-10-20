@@ -11,6 +11,17 @@ const nextConfig = {
     // Estamos a usar isto para contornar o problema de build.
     ignoreBuildErrors: true,
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "igyuufswlhhetovw.public.blob.vercel-storage.com",
+        port: "",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

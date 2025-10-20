@@ -23,7 +23,7 @@ export default function StatusUpdater({
   leadId,
   currentStatus,
 }: {
-  leadId: number;
+  leadId: string;
   currentStatus: LeadStatus;
 }) {
   const [selectedStatus, setSelectedStatus] = useState(currentStatus);

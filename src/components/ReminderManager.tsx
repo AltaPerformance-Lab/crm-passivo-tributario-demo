@@ -6,7 +6,7 @@ import type { Lembrete } from "@prisma/client";
 import { BellPlus, Calendar, Trash2, Loader2 } from "lucide-react";
 
 interface ReminderManagerProps {
-  leadId: number;
+  leadId: string;
   lembretes: Lembrete[];
 }
 
@@ -17,8 +17,9 @@ export default function ReminderManager({
   const [descricao, setDescricao] = useState("");
   const [data, setData] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null); // Estado para o erro
+  // CORREÇÃO: O ID para controle de estado agora é string
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +65,8 @@ export default function ReminderManager({
     }
   };
 
-  const handleDelete = async (lembreteId: number) => {
+  // CORREÇÃO: A função agora recebe o ID como string
+  const handleDelete = async (lembreteId: string) => {
     if (!window.confirm("Tem certeza que deseja apagar este lembrete?")) return;
     setBusyId(lembreteId);
     setError(null);
@@ -131,7 +133,7 @@ export default function ReminderManager({
                 checked={lembrete.concluido}
                 onChange={() => handleToggleConcluido(lembrete)}
                 className="mt-1 h-5 w-5 rounded border-gray-500 text-blue-500 focus:ring-blue-600 cursor-pointer"
-                disabled={busyId === lembrete.id}
+                disabled={busyId === lembrete.id} // Comparação de strings agora funciona
               />
               <div className="flex-1">
                 <p
@@ -150,7 +152,7 @@ export default function ReminderManager({
                 <Loader2 className="animate-spin text-gray-400" size={16} />
               ) : (
                 <button
-                  onClick={() => handleDelete(lembrete.id)}
+                  onClick={() => handleDelete(lembrete.id)} // Passando a string correta
                   className="text-gray-500 hover:text-red-500"
                 >
                   <Trash2 size={16} />

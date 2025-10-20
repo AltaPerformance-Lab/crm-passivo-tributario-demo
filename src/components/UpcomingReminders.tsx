@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // Importa o useRouter
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   BellRing,
@@ -14,9 +14,10 @@ import {
 import type { Lembrete } from "@prisma/client";
 import CollapsibleCard from "./CollapsibleCard";
 
+// CORREÇÃO: Os IDs agora são string
 type ReminderWithLead = Lembrete & {
   lead: {
-    id: number;
+    id: string;
     nomeDevedor: string;
   };
 };
@@ -24,11 +25,11 @@ type ReminderWithLead = Lembrete & {
 export default function UpcomingReminders() {
   const [reminders, setReminders] = useState<ReminderWithLead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const router = useRouter(); // Instancia o router
+  // CORREÇÃO: O ID para controle de estado agora é string
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const router = useRouter();
 
   const fetchReminders = async () => {
-    // Evita o piscar do 'loading' em revalidações, mas mostra na primeira carga
     if (reminders.length === 0) setIsLoading(true);
     try {
       const response = await fetch("/api/lembretes/upcoming");
@@ -46,8 +47,9 @@ export default function UpcomingReminders() {
     fetchReminders();
   }, []);
 
+  // CORREÇÃO: O ID do lembrete agora é string
   const handleAction = async (
-    reminderId: number,
+    reminderId: string,
     action: "complete" | "snooze"
   ) => {
     setBusyId(reminderId);
@@ -69,14 +71,10 @@ export default function UpcomingReminders() {
 
       if (!response.ok) throw new Error("Falha ao atualizar lembrete");
 
-      // A atualização otimista na UI é ótima, mantemos ela.
       setReminders((prev) => prev.filter((r) => r.id !== reminderId));
-
-      // ADICIONADO: Garante que o resto da página seja atualizado.
       router.refresh();
     } catch (error) {
       console.error(`Erro ao ${action} o lembrete`, error);
-      // Se der erro, busca a lista completa para garantir consistência.
       fetchReminders();
     } finally {
       setBusyId(null);
@@ -119,7 +117,7 @@ export default function UpcomingReminders() {
             <div
               key={reminder.id}
               className={`bg-gray-700/50 p-3 rounded-lg border-l-4 ${borderColor} flex flex-col justify-between transition-opacity ${
-                busyId === reminder.id ? "opacity-50" : ""
+                busyId === reminder.id ? "opacity-50" : "" // Comparação de strings agora funciona
               }`}
             >
               <div>

@@ -1,9 +1,8 @@
-// src/app/api/lembretes/[id]/route.ts (Versão Segura)
+// src/app/api/lembretes/[id]/route.ts (Versão Segura com ID String)
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { auth } from "../../../../../auth"; // Importamos a autenticação
-import { Prisma } from "@prisma/client";
+import { auth } from "../../../../../auth";
 
 export const runtime = "nodejs";
 
@@ -20,15 +19,13 @@ export async function PATCH(
       return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
     }
 
-    const lembreteId = parseInt(params.id, 10);
-    if (isNaN(lembreteId)) {
-      return NextResponse.json({ message: "ID inválido." }, { status: 400 });
-    }
+    // 1. O ID agora é uma string, removemos o parseInt e a verificação isNaN
+    const lembreteId = params.id;
 
-    // 1. VERIFICAÇÃO DE POSSE: Checamos se o lembrete pertence a um lead do usuário
+    // VERIFICAÇÃO DE POSSE: Checamos se o lembrete pertence a um lead do usuário
     const lembrete = await prisma.lembrete.findFirst({
       where: {
-        id: lembreteId,
+        id: lembreteId, // Usa a string diretamente
         lead: {
           userId: userId,
         },
@@ -80,24 +77,19 @@ export async function DELETE(
       return NextResponse.json({ message: "Não autorizado." }, { status: 401 });
     }
 
-    const lembreteId = parseInt(params.id, 10);
-    if (isNaN(lembreteId)) {
-      return NextResponse.json({ message: "ID inválido." }, { status: 400 });
-    }
+    // 2. O ID agora é uma string, removemos o parseInt e a verificação isNaN
+    const lembreteId = params.id;
 
-    // 2. VERIFICAÇÃO DE POSSE EMBUTIDA NO DELETE
-    // Usamos 'deleteMany' que permite um 'where' complexo.
-    // Ele tentará deletar um lembrete que tenha o ID E que pertença a um lead do usuário.
+    // VERIFICAÇÃO DE POSSE EMBUTIDA NO DELETE
     const deleteResult = await prisma.lembrete.deleteMany({
       where: {
-        id: lembreteId,
+        id: lembreteId, // Usa a string diretamente
         lead: {
-          userId: userId, // Garante que o usuário só pode deletar seus próprios lembretes
+          userId: userId,
         },
       },
     });
 
-    // Se o 'count' for 0, significa que o lembrete não foi encontrado ou não pertencia ao usuário.
     if (deleteResult.count === 0) {
       return NextResponse.json(
         { message: "Lembrete não encontrado ou acesso negado." },

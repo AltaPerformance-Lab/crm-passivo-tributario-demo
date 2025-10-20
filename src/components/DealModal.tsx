@@ -7,7 +7,8 @@ import { FileText, Trash2, X, Loader2 } from "lucide-react";
 import CurrencyInput from "react-currency-input-field";
 
 type DealModalProps = {
-  leadId: number;
+  // CORREÇÃO: O ID do Lead agora é string
+  leadId: string;
   initialNegocio: (Negocio & { propostas: Proposta[] }) | null;
   onClose: () => void;
 };
@@ -18,7 +19,6 @@ export default function DealModal({
   onClose,
 }: DealModalProps) {
   const router = useRouter();
-  // Unificamos o estado para simplificar
   const [dealData, setDealData] = useState(initialNegocio);
   const [financials, setFinancials] = useState({
     valorFechado: initialNegocio?.valorFechado || 0,
@@ -28,7 +28,8 @@ export default function DealModal({
   });
   const [proposalFile, setProposalFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deletingProposalId, setDeletingProposalId] = useState<number | null>(
+  // CORREÇÃO: O ID da proposta agora é string
+  const [deletingProposalId, setDeletingProposalId] = useState<string | null>(
     null
   );
 
@@ -40,11 +41,9 @@ export default function DealModal({
     setIsSubmitting(true);
     try {
       let currentNegocio = dealData;
-      let refreshNeeded = false; // Controla se precisamos atualizar a tela
+      let refreshNeeded = false;
 
-      // --- ETAPA 1: Salvar/Atualizar os dados financeiros ---
       if (!currentNegocio) {
-        // Cria um novo negócio
         const res = await fetch("/api/deals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -54,7 +53,6 @@ export default function DealModal({
         currentNegocio = await res.json();
         refreshNeeded = true;
       } else {
-        // Atualiza um negócio existente
         const res = await fetch(`/api/deals/${currentNegocio.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -65,14 +63,12 @@ export default function DealModal({
         refreshNeeded = true;
       }
 
-      // Se a primeira etapa foi bem-sucedida, atualizamos o estado local
       setDealData(currentNegocio);
 
-      // --- ETAPA 2: Fazer o upload do arquivo de proposta, se houver ---
       if (proposalFile && currentNegocio) {
         const formData = new FormData();
         formData.append("proposal", proposalFile);
-        formData.append("negocioId", String(currentNegocio.id));
+        formData.append("negocioId", currentNegocio.id); // O ID já é string
 
         const uploadRes = await fetch("/api/proposals/upload", {
           method: "POST",
@@ -80,40 +76,40 @@ export default function DealModal({
         });
         if (!uploadRes.ok)
           throw new Error("Falha ao fazer upload da proposta.");
-        refreshNeeded = true; // O upload também exige um refresh
+        refreshNeeded = true;
       }
 
-      // --- ETAPA FINAL: Atualizar a interface e fechar ---
       if (refreshNeeded) {
         router.refresh();
       }
       onClose();
     } catch (error) {
       console.error(error);
-      alert(`Erro ao salvar: ${(error as Error).message}`);
+      alert("Erro ao salvar o negócio.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteProposal = async (proposalId: number) => {
+  // CORREÇÃO: A função agora aceita o ID como string
+  const handleDeleteProposal = async (proposalId: string) => {
     if (!window.confirm("Tem certeza que deseja apagar esta proposta?")) return;
+
     setDeletingProposalId(proposalId);
     try {
       const res = await fetch(`/api/proposals/${proposalId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Falha ao apagar a proposta.");
-      router.refresh(); // Corretamente chama o refresh
+      router.refresh();
     } catch (error) {
       console.error(error);
-      alert(`Erro: ${(error as Error).message}`);
+      alert("Erro ao apagar a proposta.");
     } finally {
       setDeletingProposalId(null);
     }
   };
 
-  // O JSX não precisa de grandes mudanças, pois a lógica já era boa.
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
@@ -130,6 +126,7 @@ export default function DealModal({
           </button>
         </div>
 
+        {/* O resto do seu JSX continua igual, pois ele já lida com os tipos corretamente */}
         <div className="bg-gray-700 p-4 rounded-lg space-y-3">
           <h3 className="font-semibold">Valores do Acordo</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -201,7 +198,7 @@ export default function DealModal({
           <div className="space-y-2">
             {dealData?.propostas && dealData.propostas.length > 0 ? (
               dealData.propostas.map((proposta) => {
-                const isDeleting = deletingProposalId === proposta.id;
+                const isDeleting = deletingProposalId === proposta.id; // Agora a comparação funciona
                 return (
                   <div
                     key={proposta.id}

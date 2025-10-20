@@ -1,4 +1,4 @@
-// src/app/api/proposals/[id]/route.ts (Versão Segura)
+// src/app/api/proposals/[id]/route.ts (Versão Segura com ID String)
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
@@ -13,7 +13,6 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const session = await auth();
-  // Obtemos o ID do usuário da sessão
   const userId = session?.user?.id;
 
   if (!userId) {
@@ -21,21 +20,16 @@ export async function DELETE(
   }
 
   try {
-    const proposalId = parseInt(params.id, 10);
-    if (isNaN(proposalId)) {
-      return NextResponse.json(
-        { message: "ID da proposta inválido." },
-        { status: 400 }
-      );
-    }
+    // 1. O ID agora é uma string, removemos o parseInt
+    const proposalId = params.id;
 
     // VERIFICAÇÃO DE POSSE: Buscamos a proposta garantindo que ela
     // pertence a um negócio do usuário logado.
     const proposal = await prisma.proposta.findFirst({
       where: {
-        id: proposalId,
+        id: proposalId, // Usa a string diretamente
         negocio: {
-          userId: userId, // <-- A verificação de segurança acontece aqui
+          userId: userId,
         },
       },
     });
@@ -61,7 +55,7 @@ export async function DELETE(
 
     // Agora, com a certeza de que a proposta pertence ao usuário, apagamos o registro
     await prisma.proposta.delete({
-      where: { id: proposalId },
+      where: { id: proposalId }, // Usa a string diretamente
     });
 
     return NextResponse.json(

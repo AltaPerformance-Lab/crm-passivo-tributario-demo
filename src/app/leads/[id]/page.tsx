@@ -1,5 +1,3 @@
-// src/app/leads/[id]/page.tsx (Versão Segura)
-
 import { PrismaClient, Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { formatCNPJ, formatPhone } from "@/lib/utils";
@@ -21,31 +19,33 @@ const leadWithDetails = Prisma.validator<Prisma.LeadDefaultArgs>()({
   include: {
     empresa: { include: { socios: true, contatos: true } },
     negocio: { include: { propostas: true } },
-    atividades: true,
-    lembretes: true,
+    atividades: { orderBy: { criadoEm: "desc" } },
+    lembretes: { orderBy: { data: "asc" } },
   },
 });
 type LeadWithDetails = Prisma.LeadGetPayload<typeof leadWithDetails>;
 
-// 2. A função de busca agora EXIGE o userId para garantir a segurança
 async function getLeadDetails(
-  id: number,
+  id: string,
   userId: string
 ): Promise<LeadWithDetails | null> {
+  if (!id || id.length < 20) {
+    // Pequena guarda contra IDs inválidos
+    return null;
+  }
+
   const lead = await prisma.lead.findFirst({
-    // Usamos findFirst para a busca composta
     where: {
       id: id,
-      userId: userId, // <-- Filtro de segurança
+      userId: userId,
     },
     include: {
       empresa: { include: { socios: true, contatos: true } },
       negocio: { include: { propostas: true } },
-      atividades: { orderBy: { criadoEm: "desc" } }, // Boa prática: ordenar atividades
-      lembretes: { orderBy: { data: "asc" } }, // Boa prática: ordenar lembretes
+      atividades: { orderBy: { criadoEm: "desc" } },
+      lembretes: { orderBy: { data: "asc" } },
     },
   });
-  if (!lead) return null;
   return lead;
 }
 
@@ -56,7 +56,7 @@ const InfoCard = ({
   children,
 }: {
   title: string;
-  value?: string | number | null | undefined;
+  value?: string | number | null;
   className?: string;
   children?: React.ReactNode;
 }) => (
@@ -71,27 +71,22 @@ export default async function LeadDetailPage({
 }: {
   params: { id: string };
 }) {
-  // 3. Obtemos a sessão diretamente no Server Component
   const session = await auth();
   const userId = session?.user?.id;
 
   if (!userId) {
-    // Se por algum motivo não houver sessão, nega o acesso.
-    // O middleware já deve ter feito isso, mas é uma camada extra de segurança.
     notFound();
   }
 
-  const leadId = parseInt(params.id, 10);
-  // 4. Passamos o userId para a função de busca
+  const leadId = params.id;
   const lead = await getLeadDetails(leadId, userId);
 
   if (!lead) {
-    notFound(); // Se o lead não existe OU não pertence ao usuário, a página não é encontrada
+    notFound();
   }
 
   const empresa = lead.empresa;
 
-  // O resto do seu JSX continua exatamente o mesmo, pois ele já recebe o 'lead' correto e seguro
   return (
     <main className="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -137,12 +132,13 @@ export default async function LeadDetailPage({
             <ProposalManager lead={lead} />
           </div>
         </div>
-        {empresa && (
+
+        {lead.empresa && (
           <>
             <CollapsibleCard title="Gestão de Contatos">
               <ContactManager
-                contatos={empresa.contatos}
-                empresaId={empresa.id}
+                contatos={lead.empresa.contatos}
+                empresaId={lead.empresa.id}
               />
             </CollapsibleCard>
             <CollapsibleCard title="Histórico de Atividades">
@@ -153,6 +149,7 @@ export default async function LeadDetailPage({
             </CollapsibleCard>
           </>
         )}
+
         <CollapsibleCard title="Dados Cadastrais">
           {empresa ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -196,8 +193,8 @@ export default async function LeadDetailPage({
                 title="Endereço"
                 value={`${empresa.logradouro || ""}, ${
                   empresa.numero || ""
-                } - ${empresa.bairro || ""}, ${empresa.municipio} - ${
-                  empresa.uf
+                } - ${empresa.bairro || ""}, ${empresa.municipio || ""} - ${
+                  empresa.uf || ""
                 }`}
                 className="md:col-span-2 lg:col-span-3"
               />
@@ -208,6 +205,7 @@ export default async function LeadDetailPage({
             </p>
           )}
         </CollapsibleCard>
+
         {empresa && (
           <>
             <CollapsibleCard title="Atividades Econômicas (CNAE)">
@@ -259,13 +257,6 @@ export default async function LeadDetailPage({
               </div>
             </CollapsibleCard>
           </>
-        )}
-        {!empresa && (
-          <div className="bg-gray-800 shadow-md rounded-lg p-6 text-center text-gray-400">
-            <p>
-              Clique em "Enriquecer Dados" para carregar os detalhes do lead.
-            </p>
-          </div>
         )}
       </div>
     </main>
