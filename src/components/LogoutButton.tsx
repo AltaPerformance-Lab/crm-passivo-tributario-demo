@@ -13,3 +13,7 @@ export default function LogoutButton() {
     </form>
   );
 }
+
+//Botão de logout simples que aciona a função handleSignOut ao ser clicado.
+//Importa o ícone PowerIcon da biblioteca Heroicons para exibir um ícone de energia no botão.
+//Usa estilos Tailwind CSS para estilizar o botão, garantindo que ele seja responsivo e tenha uma boa aparência em diferentes tamanhos de tela.
